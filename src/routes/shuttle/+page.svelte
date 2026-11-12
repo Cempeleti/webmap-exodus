@@ -9,9 +9,33 @@
 
 	let isModalOpen = $state(false);
 	let id = $derived(browser ? (page.url.searchParams.get('id') ?? '') : '');
-	let shuttle = $derived(getShuttleById(id));
+	let customShuttle = $state<import('$lib').Shuttle | null>(null);
+
+	$effect(() => {
+		if (browser && id === 'custom') {
+			try {
+				const raw = sessionStorage.getItem('custom_preview_shuttle');
+				if (raw) {
+					customShuttle = JSON.parse(raw);
+				}
+			} catch (e) {
+				console.error('Failed to parse custom shuttle preview:', e);
+			}
+		} else {
+			customShuttle = null;
+		}
+	});
+
+	let shuttle = $derived(id === 'custom' ? customShuttle : getShuttleById(id));
 	let factionColor = $derived(
 		shuttle ? (shuttleGroupColors[shuttle.group] ?? '#0B9FC0') : '#0B9FC0'
+	);
+	let imageSrc = $derived(
+		shuttle?.image?.startsWith('data:')
+			? shuttle.image
+			: shuttle
+				? asset(shuttle.image as `/${string}`)
+				: ''
 	);
 </script>
 
@@ -217,7 +241,7 @@
 					aria-label="Открыть изображение на весь экран: {shuttle.name}"
 					title="Нажмите для просмотра в полном размере"
 				>
-					<img src={asset(shuttle.image as `/${string}`)} alt={shuttle.name} class="shuttle-img" />
+					<img src={imageSrc} alt={shuttle.name} class="shuttle-img" />
 					<div class="zoom-hint" aria-hidden="true">
 						<svg
 							width="16"
@@ -241,7 +265,7 @@
 
 	{#if isModalOpen}
 		<ImageModal
-			src={asset(shuttle.image as `/${string}`)}
+			src={imageSrc}
 			alt={shuttle.name}
 			onClose={() => (isModalOpen = false)}
 		/>

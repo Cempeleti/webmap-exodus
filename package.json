@@ -12,6 +12,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
+		"build:editor": "npm --prefix editor run build",
+		"build:editor-monolith": "npm --prefix editor run build:deploy-minimal",
 		"parse-shuttles": "node scripts/parse-shuttle-event.js",
 		"generate-shuttles": "node scripts/generate-shuttles.js"
 	},

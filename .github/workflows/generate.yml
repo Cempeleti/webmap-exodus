@@ -167,6 +167,13 @@ jobs:
         run: |
           node current-repo/scripts/update-maps-checksums.js monolith current-repo
 
+      - name: Build Shuttle Editor with Monolith resources
+        run: |
+          cd current-repo/editor
+          npm install
+          node scripts/prebuild-resources.mjs --resources-dir=../../monolith/Resources --fork-name="Monolith" --textures=minimal
+          npm run build
+
       - name: Commit and push
         run: |
           cd current-repo
@@ -174,6 +181,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/
           git add static/
+          git add editor/ 2>/dev/null || true
           git add scripts/ 2>/dev/null || true
           git add ShuttleEvent/ 2>/dev/null || true
           git add POI/ 2>/dev/null || true

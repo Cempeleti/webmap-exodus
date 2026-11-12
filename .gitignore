@@ -26,3 +26,4 @@ vite.config.ts.timestamp-*
 maps_to_render.txt
 /POI/
 /ShuttleEvent/
+/static/editor/resources/
