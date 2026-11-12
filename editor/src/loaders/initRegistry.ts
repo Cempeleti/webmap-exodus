@@ -3,6 +3,24 @@ import { resolveTiles, resolveEntities, resolveDecals } from './prototypeResolve
 import { PrototypeRegistry } from './prototypeRegistry';
 import type { ResourceProvider } from './resourceProvider';
 import { HttpResourceProvider } from './resourceProvider';
+import type { ResolvedTile, ResolvedEntity, DecalPrototypeInfo } from './registryTypes';
+
+export interface PrebakedRegistryBundle {
+  forkName?: string;
+  tiles: Record<string, ResolvedTile>;
+  entities: Record<string, ResolvedEntity>;
+  decals: Record<string, DecalPrototypeInfo>;
+}
+
+/**
+ * Fast synchronous initialization of PrototypeRegistry from a prebaked JSON bundle.
+ */
+export function initRegistryFromBundle(bundle: PrebakedRegistryBundle): PrototypeRegistry {
+  const tiles = new Map(Object.entries(bundle.tiles));
+  const entities = new Map(Object.entries(bundle.entities));
+  const decals = new Map(Object.entries(bundle.decals ?? {}));
+  return new PrototypeRegistry(tiles, entities, decals);
+}
 
 /**
  * Initialize the prototype registry by discovering and parsing all game prototypes.

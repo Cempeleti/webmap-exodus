@@ -171,6 +171,7 @@ jobs:
         run: |
           cd current-repo/editor
           npm install
+          node scripts/bake-registry.mjs --resources-dir=../../monolith/Resources
           node scripts/prebuild-resources.mjs --resources-dir=../../monolith/Resources --fork-name="Monolith" --textures=minimal
           npm run build
 

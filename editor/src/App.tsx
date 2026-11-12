@@ -32,7 +32,7 @@ import { StatusBar } from './components/StatusBar';
 import { LoadingScreen } from './components/LoadingScreen';
 import { LayerPanel } from './components/LayerPanel';
 import { useKeyboard } from './hooks/useKeyboard';
-import { initRegistry } from './loaders/initRegistry';
+import { initRegistry, initRegistryFromBundle } from './loaders/initRegistry';
 import { setActiveProvider, HttpResourceProvider } from './loaders/resourceProvider';
 import type { ResourceProvider } from './loaders/resourceProvider';
 import { ForkSelector } from './components/ForkSelector';
@@ -135,7 +135,35 @@ export const App: React.FC = () => {
     let active = true;
 
     const tryLoad = async () => {
-      // 1. Try relative resources path (supports nested subpath deployment /webmap-exodus/editor/)
+      // 1. First priority: pre-baked monolithic registry (instant load, no folder selection needed)
+      const bundleCandidates = [
+        './resources/monolith-registry.json',
+        '/editor/resources/monolith-registry.json',
+        '/resources/monolith-registry.json',
+      ];
+      for (const candidate of bundleCandidates) {
+        try {
+          const r = await fetch(candidate);
+          if (r.ok && active) {
+            setLoadingMessage('Загрузка билда Monolith (Exodus)...');
+            const bundle = await r.json();
+            const name = bundle.forkName || 'Monolith (Exodus)';
+            const basePath = candidate.substring(0, candidate.lastIndexOf('/resources'));
+            const provider = new HttpResourceProvider(basePath, name);
+            setBuiltInAvailable(true);
+            setBuiltInForkName(name);
+            setForkProvider(provider);
+            setForkName(name);
+            setActiveProvider(provider);
+            const registry = initRegistryFromBundle(bundle);
+            dispatch({ type: 'SET_REGISTRY', registry });
+            setStatusMessage(`Билд ${name} загружен (${registry.entityCount} сущностей, ${registry.tileCount} тайлов)`);
+            return;
+          }
+        } catch { /* continue to next candidate */ }
+      }
+
+      // 2. Try relative resources path (supports nested subpath deployment /webmap-exodus/editor/)
       try {
         const r = await fetch('./resources/_manifests/entities.json');
         if (r.ok && active) {
@@ -148,7 +176,7 @@ export const App: React.FC = () => {
         }
       } catch { /* continue */ }
 
-      // 2. Try root resources path
+      // 3. Try root resources path
       try {
         const r = await fetch('/resources/_manifests/entities.json');
         if (r.ok && active) {
@@ -161,7 +189,7 @@ export const App: React.FC = () => {
         }
       } catch { /* continue */ }
 
-      // 3. Try dev server resources-list
+      // 4. Try dev server resources-list
       try {
         const r = await fetch('/resources-list?dir=Prototypes/Entities&ext=.yml');
         if (r.ok && active) {

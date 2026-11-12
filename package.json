@@ -14,6 +14,7 @@
 		"format": "prettier --write .",
 		"build:editor": "npm --prefix editor run build",
 		"build:editor-monolith": "npm --prefix editor run build:deploy-minimal",
+		"bake:editor": "node editor/scripts/bake-registry.mjs",
 		"parse-shuttles": "node scripts/parse-shuttle-event.js",
 		"generate-shuttles": "node scripts/generate-shuttles.js"
 	},
