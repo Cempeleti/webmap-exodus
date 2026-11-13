@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 	import configJson from '$root/config.json' with { type: 'json' };
 
-	const shuttleId = page.url.searchParams.get('shuttle');
-	const editorUrl = `${base}/editor/index.html${
-		shuttleId ? `?shuttle=${encodeURIComponent(shuttleId)}` : ''
-	}`;
+	let editorUrl = $state(`${base}/editor/index.html`);
+
+	onMount(() => {
+		const shuttleId = new URLSearchParams(window.location.search).get('shuttle');
+		if (shuttleId) {
+			editorUrl = `${base}/editor/index.html?shuttle=${encodeURIComponent(shuttleId)}`;
+		}
+	});
 </script>
 
 <svelte:head>
