@@ -18,6 +18,7 @@ export interface Shuttle {
 	classes: ShuttleClass[];
 	engines: ShuttleEngine[];
 	image: string;
+	mapPath?: string;
 	voucher?: boolean;
 }
 

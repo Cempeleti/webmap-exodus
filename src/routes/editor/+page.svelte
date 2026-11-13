@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { page } from '$app/state';
 	import configJson from '$root/config.json' with { type: 'json' };
 
-	const editorUrl = `${base}/editor/index.html`;
+	const shuttleId = page.url.searchParams.get('shuttle');
+	const editorUrl = `${base}/editor/index.html${
+		shuttleId ? `?shuttle=${encodeURIComponent(shuttleId)}` : ''
+	}`;
 </script>
 
 <svelte:head>

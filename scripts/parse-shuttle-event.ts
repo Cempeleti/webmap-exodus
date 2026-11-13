@@ -16,6 +16,7 @@ interface Shuttle {
 	classes: string[];
 	engines: string[];
 	image: string;
+	mapPath?: string;
 }
 
 interface ShuttleData {
@@ -71,6 +72,15 @@ function resolveImagePath(id: string): string {
 	}
 
 	return '/atom.png';
+}
+
+function copyMapForEditor(id: string, sourcePath: string): string {
+	const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+	const relativePath = `maps/by-id/${safeId}.yml`;
+	const destinationPath = path.join(__dirname, '..', 'static', 'editor', relativePath);
+	fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+	fs.copyFileSync(sourcePath, destinationPath);
+	return relativePath;
 }
 
 interface EighthFleetInfo {
@@ -188,6 +198,7 @@ function createEighthFleetShuttleFromFile(filename: string, shuttleEventDir: str
 	const size = determineShuttleSize(entityCount);
 	const imagePath = resolveImagePath(id);
 	const known = KNOWN_EIGHTH_FLEET_INFO[filename];
+	const mapPath = copyMapForEditor(`eighth-${id}`, ymlPath);
 
 	return {
 		id: `eighth-${id}`,
@@ -199,7 +210,8 @@ function createEighthFleetShuttleFromFile(filename: string, shuttleEventDir: str
 		size,
 		classes: known?.classes ?? ['fighter'],
 		engines: known?.engines ?? ['rtg', 'apu'],
-		image: imagePath
+		image: imagePath,
+		mapPath
 	};
 }
 
@@ -477,6 +489,7 @@ function createPoiStationFromFile(filename: string, poiDir: string): Shuttle {
 
 	const size = determineShuttleSize(entityCount);
 	const imagePath = resolveImagePath(id);
+	const mapPath = copyMapForEditor(`station-${id}`, ymlPath);
 
 	return {
 		id: `station-${id}`,
@@ -488,7 +501,8 @@ function createPoiStationFromFile(filename: string, poiDir: string): Shuttle {
 		size,
 		classes: known?.classes ?? ['science'],
 		engines: known?.engines ?? ['apu'],
-		image: imagePath
+		image: imagePath,
+		mapPath
 	};
 }
 

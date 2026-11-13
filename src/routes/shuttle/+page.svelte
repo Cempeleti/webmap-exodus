@@ -230,6 +230,14 @@
 				<!-- Action -->
 				<div class="action-row">
 					<Button text="Вернуться в каталог" onClick={() => window.history.back()} />
+					{#if shuttle.mapPath}
+						<a
+							class="edit-link"
+							href={resolve(`/editor?shuttle=${encodeURIComponent(shuttle.id)}`)}
+						>
+							Редактировать в редакторе
+						</a>
+					{/if}
 				</div>
 			</div>
 
@@ -281,6 +289,30 @@
 		flex: 1;
 		padding: 40px 16px;
 	}
+
+	.edit-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 8px 20px;
+		border: 1px solid var(--accent);
+		border-radius: var(--radius);
+		color: var(--accent);
+		font-family: var(--font-display);
+		font-size: 0.875rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-decoration: none;
+		transition:
+			background 0.2s,
+			color 0.2s;
+	}
+
+	.edit-link:hover {
+		background: var(--accent-muted);
+		color: var(--text);
+	}
+
 	.not-found-inner {
 		display: flex;
 		flex-direction: column;
@@ -510,6 +542,10 @@
 
 	/* Action */
 	.action-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
 		padding-top: 8px;
 		border-top: 1px solid var(--border-dim);
 	}

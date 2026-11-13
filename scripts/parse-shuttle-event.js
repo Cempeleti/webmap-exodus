@@ -66,6 +66,15 @@ function resolveImagePath(id) {
 	return '/atom.png';
 }
 
+function copyMapForEditor(id, sourcePath) {
+	const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+	const relativePath = `maps/by-id/${safeId}.yml`;
+	const destinationPath = path.join(__dirname, '..', 'static', 'editor', relativePath);
+	fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+	fs.copyFileSync(sourcePath, destinationPath);
+	return relativePath;
+}
+
 const KNOWN_EIGHTH_FLEET_INFO = {
 	'wyvern.yml': {
 		hullClass: 'battleship',
@@ -182,6 +191,7 @@ function createEighthFleetShuttleFromFile(filename, shuttleEventDir) {
 
 	const imagePath = resolveImagePath(id);
 	const known = KNOWN_EIGHTH_FLEET_INFO[filename];
+	const mapPath = copyMapForEditor(`eighth-${id}`, ymlPath);
 
 	return {
 		id: `eighth-${id}`,
@@ -193,7 +203,8 @@ function createEighthFleetShuttleFromFile(filename, shuttleEventDir) {
 		size,
 		classes: known?.classes ?? ['fighter'],
 		engines: known?.engines ?? ['rtg', 'apu'],
-		image: imagePath
+		image: imagePath,
+		mapPath
 	};
 }
 
@@ -464,6 +475,7 @@ function createPoiStationFromFile(filename, poiDir) {
 
 	const size = determineShuttleSize(entityCount);
 	const imagePath = resolveImagePath(id);
+	const mapPath = copyMapForEditor(`station-${id}`, ymlPath);
 
 	return {
 		id: `station-${id}`,
@@ -475,7 +487,8 @@ function createPoiStationFromFile(filename, poiDir) {
 		size,
 		classes: known?.classes ?? ['science'],
 		engines: known?.engines ?? ['apu'],
-		image: imagePath
+		image: imagePath,
+		mapPath
 	};
 }
 
