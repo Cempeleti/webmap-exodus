@@ -111,6 +111,7 @@ export const App: React.FC = () => {
   const [infraSelection, setInfraSelection] = useState<InfrastructureSelection>({
     mode: 'cable', cableType: 'CableHV', pipeType: 'supply',
   });
+  const webmapLoadStartedRef = useRef(false);
   const cameraRef = useRef(new Camera());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const decalPlacementSettingsRef = useRef<DecalPlacementSettings>({ ...DEFAULT_DECAL_PLACEMENT_SETTINGS });
@@ -295,6 +296,32 @@ export const App: React.FC = () => {
       setStatusMessage(`Import failed: ${err}`);
     }
   }, []);
+
+  // The catalog can open the editor with ?shuttle=<id>. Generated webmap
+  // builds publish matching YAML files under ./maps/by-id/.
+  useEffect(() => {
+    if (!state.registry || !forkProvider || webmapLoadStartedRef.current) return;
+
+    const shuttleId = new URLSearchParams(window.location.search).get('shuttle');
+    if (!shuttleId) return;
+
+    webmapLoadStartedRef.current = true;
+    const mapUrl = `./maps/by-id/${encodeURIComponent(shuttleId)}.yml`;
+    fetch(mapUrl)
+      .then(async response => {
+        if (!response.ok) {
+          throw new Error(`Webmap YAML not found (${response.status})`);
+        }
+        return response.text();
+      })
+      .then(content => {
+        handleImport(content);
+        setStatusMessage(`Открыт шаттл из вебмапа: ${shuttleId}`);
+      })
+      .catch(error => {
+        setStatusMessage(`Не удалось открыть шаттл из вебмапа: ${error}`);
+      });
+  }, [forkProvider, handleImport, state.registry]);
 
   const handleSearchNavigate = useCallback((entity: ImportedEntity) => {
     // Switch to entity select tool so the selection is visible

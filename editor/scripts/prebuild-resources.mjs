@@ -7,7 +7,7 @@
  * 2. Copies required Resources into public/resources/ for static serving
  *
  * Usage: node scripts/prebuild-resources.mjs [--textures=minimal|full|none] [--fork-name=Name]
- *   --textures=minimal  (default) Tiles + Structures + Markers + fork content (~27 MB)
+ *   --textures=minimal  (default) Tiles + Structures + Markers + all fork content
  *   --textures=full     All textures (~150 MB)
  *   --textures=none     Prototypes only, no textures (~8 MB)
  *   --fork-name=Name    Label shown for the built-in resources in the UI. If omitted,
@@ -213,11 +213,13 @@ if (textureMode === 'full') {
   console.log(`  Copied ${count} texture files`);
 } else if (textureMode !== 'none') {
   const dirs = [...(TEXTURE_SETS[textureMode] ?? TEXTURE_SETS.minimal)];
-  // Mirror the base texture set under any discovered fork directory (e.g. a fork's
-  // _MyFork/Structures). Missing directories are skipped by copyDirRecursive.
-  const baseSet = TEXTURE_SETS.minimal;
+  // Copy every texture directory owned by a fork. Fork prototypes can reference
+  // assets outside the base set, such as _Mono/Objects/ShuttleWeapons.
   for (const fork of forkPrefixes) {
-    for (const sub of baseSet) dirs.push(`${fork}/${sub}`);
+    const forkTextureDir = path.join(textureSrc, fork);
+    if (fs.existsSync(forkTextureDir)) {
+      dirs.push(fork);
+    }
   }
   let totalCount = 0;
   for (const subdir of dirs) {

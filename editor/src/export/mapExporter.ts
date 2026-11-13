@@ -39,7 +39,7 @@ export function exportMap(
   const shuttleName = options?.shuttleName || (map.gridDataList?.[0]?.name) || 'Shuttle';
 
   const { tilemap, reverseTilemap } = buildTilemap(map);
-  const gridChunksMap = buildGridChunksMap(map, reverseTilemap);
+  const gridChunksMap = buildGridChunksMap(map, reverseTilemap, format);
   const gridDecalsMap = buildGridDecalsMap(map, decalsDirty);
   const entityGroupsYaml = buildEntityGroupsYaml(map, asGrid);
 
@@ -456,9 +456,9 @@ function buildChunksYamlForGrid(
 function buildGridChunksMap(
   map: ImportedMap,
   reverseTilemap: Record<string, number>,
+  format: number,
 ): Map<number, string[]> {
   const result = new Map<number, string[]>();
-  const format = map.meta.format;
 
   if (map.gridDataList && map.gridDataList.length > 0) {
     for (const gd of map.gridDataList) {

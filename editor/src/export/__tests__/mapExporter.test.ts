@@ -514,5 +514,17 @@ entities:
       expect(reimported.meta.category).toBe('Grid');
       expect(reimported.gridUid).toBe(1);
     });
+
+    it('encodes format 6 shuttle tiles using the format 7 chunk layout', () => {
+      const map = makeMinimalMap();
+      map.grid.cells = Array(256).fill(null).map(() => ({ tileId: 'FloorSteel' }));
+
+      const yamlStr = exportMap(map, undefined, { exportAsGrid: true });
+      const reimported = importMap(yamlStr);
+
+      expect(reimported.meta.format).toBe(7);
+      expect(reimported.grid.cells).toHaveLength(256);
+      expect(reimported.grid.cells[255].tileId).toBe('FloorSteel');
+    });
   });
 });

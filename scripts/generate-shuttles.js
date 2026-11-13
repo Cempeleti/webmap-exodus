@@ -313,6 +313,26 @@ function resolveImage(vessel, staticDir) {
 	return `/${vessel.id.toLowerCase()}-0.png`;
 }
 
+function copyMapForEditor(monolithDir, repoDir, id, shuttlePath) {
+	if (!shuttlePath) return undefined;
+
+	const normalizedPath = shuttlePath.replace(/^[/\\]+/, '').replace(/\\/g, '/');
+	const candidates = [
+		path.join(monolithDir, normalizedPath),
+		path.join(monolithDir, 'Resources', normalizedPath),
+		path.join(monolithDir, normalizedPath.replace(/^Resources\//, ''))
+	];
+	const sourcePath = candidates.find((candidate) => fs.existsSync(candidate));
+	if (!sourcePath) return undefined;
+
+	const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+	const relativePath = `maps/by-id/${safeId}.yml`;
+	const destinationPath = path.join(repoDir, 'static/editor', relativePath);
+	fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+	fs.copyFileSync(sourcePath, destinationPath);
+	return relativePath;
+}
+
 /**
  * Main generator function.
  */
@@ -430,6 +450,7 @@ export function generateShuttles(monolithDir, repoDir) {
 
 		// Image
 		const image = resolveImage(proto, staticDir);
+		const mapPath = copyMapForEditor(monolithDir, repoDir, proto.id, shuttlePath);
 
 		// HullClass
 		const hullClass = calculateHullClass({ ...proto, size, classes }, existing?.hullClass);
@@ -452,7 +473,8 @@ export function generateShuttles(monolithDir, repoDir) {
 			engines,
 			image,
 			hullClass,
-			voucher
+			voucher,
+			...(mapPath ? { mapPath } : {})
 		};
 
 		generatedVessels.push(vesselEntry);
