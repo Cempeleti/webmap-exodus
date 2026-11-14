@@ -9,6 +9,7 @@ import type {
   SpriteInfo,
   SpriteLayerInfo,
 } from './registryTypes';
+import { normalizeRsiPath } from './rsiLoader';
 
 /**
  * Convert raw tile prototypes into resolved tiles with defaulted fields.
@@ -91,7 +92,7 @@ export function extractSpriteInfo(components: RawComponent[]): SpriteInfo | null
   const rawLayers = (spriteComp.layers ?? []) as Array<Record<string, unknown>>;
   const layers: SpriteLayerInfo[] = rawLayers.map(l => ({
     state: (l.state as string) ?? '',
-    sprite: l.sprite as string | undefined,
+    sprite: l.sprite ? normalizeRsiPath(l.sprite as string) : undefined,
     map: l.map as string[] | undefined,
     visible: l.visible as boolean | undefined,
     shader: l.shader as string | undefined,
@@ -105,7 +106,7 @@ export function extractSpriteInfo(components: RawComponent[]): SpriteInfo | null
   // mode (e.g., hydroponicsSoil→hydroponicsTray) and should be ignored in favor of the
   // first visible layer's sprite. If some layers lack their own sprite, the top-level is
   // meaningful (e.g., GasVentPump where layer 1 relies on the top-level vent.rsi).
-  const topLevelSprite = spriteComp.sprite as string | undefined;
+  const topLevelSprite = spriteComp.sprite ? normalizeRsiPath(spriteComp.sprite as string) : undefined;
   const anyLayerReliesOnTopLevel = layers.length > 0 && layers.some(l => !l.sprite);
   let rsiPath: string | undefined;
 
@@ -131,6 +132,9 @@ export function extractSpriteInfo(components: RawComponent[]): SpriteInfo | null
         break;
       }
     }
+    if (!rsiPath && layers[0]?.sprite) {
+      rsiPath = layers[0].sprite;
+    }
   }
   if (!rsiPath) return null;
 
@@ -146,6 +150,9 @@ export function extractSpriteInfo(components: RawComponent[]): SpriteInfo | null
     if (layer.sprite && layer.sprite !== rsiPath) continue;
     baseState = layer.state;
     break;
+  }
+  if (!baseState && layers[0]?.state) {
+    baseState = layers[0].state;
   }
 
   // EntityStorageVisuals override: lockers/crates define their closed-state sprite
@@ -358,7 +365,7 @@ export function resolveDecals(
     let defaultCustomColor = false;
 
     for (const proto of chain) {
-      if (proto.sprite?.sprite) rsiPath = proto.sprite.sprite;
+      if (proto.sprite?.sprite) rsiPath = normalizeRsiPath(proto.sprite.sprite);
       if (proto.sprite?.state) state = proto.sprite.state;
       if (proto.tags) tags = proto.tags;
       if (proto.snapCardinals !== undefined) snapCardinals = proto.snapCardinals;

@@ -7,9 +7,12 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const defaultMonolith = fs.existsSync('D:/eexouds/a/Monolith/Resources')
-  ? 'D:/eexouds/a/Monolith/Resources'
-  : path.resolve(__dirname, '../../monolith/Resources');
+const homeMonolith = path.resolve(process.env.HOME || '', 'Documents/Monolith/Resources');
+const defaultMonolith = fs.existsSync(homeMonolith)
+  ? homeMonolith
+  : (fs.existsSync('D:/eexouds/a/Monolith/Resources')
+    ? 'D:/eexouds/a/Monolith/Resources'
+    : path.resolve(__dirname, '../../monolith/Resources'));
 const resourcesPath =
   process.env.MONOLITH_RESOURCES ||
   (fs.existsSync(defaultMonolith) ? defaultMonolith : path.resolve(__dirname, '../../Resources'));

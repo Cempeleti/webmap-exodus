@@ -105,7 +105,7 @@ export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
 
 interface PrototypeFlags {
   isMarker: boolean;
-  placeholderCategory: 'spawn' | 'cable' | 'pipe' | 'generic';
+  placeholderCategory: 'spawn' | 'cable' | 'pipe' | 'weapon' | 'generic';
 }
 
 const prototypeFlagCache = new Map<string, PrototypeFlags>();
@@ -118,6 +118,14 @@ export function getPrototypeFlags(prototype: string): PrototypeFlags {
   let placeholderCategory: PrototypeFlags['placeholderCategory'] = 'generic';
   if (prototype.includes('Spawn') || prototype.includes('Marker') || prototype.includes('Spawner')) {
     placeholderCategory = 'spawn';
+  } else if (
+    prototype.includes('Gun') ||
+    prototype.includes('Turret') ||
+    prototype.includes('Weapon') ||
+    prototype.includes('Cannon') ||
+    prototype.includes('Artillery')
+  ) {
+    placeholderCategory = 'weapon';
   } else if (prototype.includes('Cable')) {
     placeholderCategory = 'cable';
   } else if (prototype.includes('Pipe') || prototype.includes('Gas')) {
@@ -137,6 +145,7 @@ const PLACEHOLDER_COLORS: Record<PrototypeFlags['placeholderCategory'], string> 
   spawn: 'rgba(0, 220, 0, 0.5)',
   cable: 'rgba(255, 150, 0, 0.5)',
   pipe: 'rgba(0, 180, 220, 0.5)',
+  weapon: 'rgba(255, 60, 60, 0.85)',
   generic: 'rgba(200, 100, 200, 0.4)',
 };
 
@@ -483,7 +492,19 @@ export function getEntitySprite(
       return null;
     }
 
-    loadSprite(spriteInfo, direction, 0, stateOverride)
+    let effectiveSpriteInfo = spriteInfo;
+    if (!effectiveSpriteInfo.rsiPath && effectiveSpriteInfo.layers && effectiveSpriteInfo.layers.length > 0) {
+      const layerWithSprite = effectiveSpriteInfo.layers.find(l => l.sprite);
+      if (layerWithSprite?.sprite) {
+        effectiveSpriteInfo = {
+          ...effectiveSpriteInfo,
+          rsiPath: layerWithSprite.sprite,
+          baseState: effectiveSpriteInfo.baseState || layerWithSprite.state || '',
+        };
+      }
+    }
+
+    loadSprite(effectiveSpriteInfo, direction, 0, stateOverride)
       .then((drawInfo) => {
         entitySpriteCache.set(cacheKey, drawInfo);
         markSceneDirty();
@@ -576,14 +597,38 @@ function drawPlaceholder(
   prototype: string,
   forLod = false,
 ): void {
-  // Skip placeholders when zoomed out (they clutter the view), unless in LOD mode
-  if (!forLod && tileScreenSize < 8) return;
+  const flags = getPrototypeFlags(prototype);
+
+  // Skip placeholders when zoomed out (they clutter the view), unless in LOD mode or weapon
+  if (!forLod && tileScreenSize < 8 && flags.placeholderCategory !== 'weapon') return;
 
   const cx = screenX + tileScreenSize / 2;
   const cy = screenY + tileScreenSize / 2;
+
+  if (flags.placeholderCategory === 'weapon') {
+    const size = Math.max(3, tileScreenSize * 0.35);
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 60, 60, 0.85)';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1, tileScreenSize * 0.05);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Turret gun barrel indicator pointing North
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx, cy - size * 1.3);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   const r = Math.max(0.5, tileScreenSize * 0.2);
 
-  ctx.fillStyle = PLACEHOLDER_COLORS[getPrototypeFlags(prototype).placeholderCategory];
+  ctx.fillStyle = PLACEHOLDER_COLORS[flags.placeholderCategory];
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();

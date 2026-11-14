@@ -35,6 +35,19 @@ export interface SpriteDrawInfo {
 // ---- Pure functions (unit-tested) ----
 
 /**
+ * Normalizes an RSI path by removing leading slashes, Windows backslashes,
+ * and redundant 'Textures/' prefixes so it reliably maps to the texture root.
+ */
+export function normalizeRsiPath(rsiPath: string): string {
+  if (!rsiPath) return '';
+  return rsiPath
+    .trim()
+    .replace(/^[/\\\\]?Textures[/\\\\]/i, '')
+    .replace(/^[/\\\\]+/, '')
+    .replace(/\\/g, '/');
+}
+
+/**
  * Parse a raw meta.json object into indexed state data.
  * Each state has directions (default 1), frameCount (from delays[0].length or 1),
  * and yOffset (cumulative row offset, each state occupies `directions` rows
@@ -97,18 +110,19 @@ const imageCache = new Map<string, Promise<HTMLImageElement>>();
 /**
  * Fetch and parse meta.json for an RSI directory. Results are cached.
  * Uses the active ResourceProvider to resolve the URL.
- * @param rsiPath - Relative path like "Structures/Power/apc.rsi"
+ * @param rsiPath - Relative path like "Structures/Power/apc.rsi" or "/Textures/..."
  */
 export async function loadRsiMeta(
   rsiPath: string,
 ): Promise<RsiMeta> {
-  const key = rsiPath;
+  const cleanPath = normalizeRsiPath(rsiPath);
+  const key = cleanPath;
 
   if (!metaCache.has(key)) {
     const provider = getActiveProvider();
-    const texPath = rsiPath.startsWith('Textures/') ? `/${rsiPath}` : `/Textures/${rsiPath}`;
+    const texPath = `/Textures/${cleanPath}`;
     const promise = provider.readText(`${texPath}/meta.json`)
-      .then((text) => JSON.parse(text) as RsiRawMeta)
+      .then((text) => JSON.parse(text.replace(/^\uFEFF/, '')) as RsiRawMeta)
       .then(parseRsiMeta);
     metaCache.set(key, promise);
   }
@@ -143,8 +157,9 @@ export async function loadRsiStateImage(
   rsiPath: string,
   stateName: string,
 ): Promise<HTMLImageElement> {
+  const cleanPath = normalizeRsiPath(rsiPath);
   const provider = getActiveProvider();
-  const texPath = rsiPath.startsWith('Textures/') ? `/${rsiPath}` : `/Textures/${rsiPath}`;
+  const texPath = `/Textures/${cleanPath}`;
   const url = provider.getImageUrl(`${texPath}/${stateName}.png`);
   return loadImage(url);
 }
@@ -165,16 +180,81 @@ export async function loadSprite(
   frame: number,
   stateOverride?: string,
 ): Promise<SpriteDrawInfo | null> {
-  const meta = await loadRsiMeta(spriteInfo.rsiPath);
-  const stateName = stateOverride ?? spriteInfo.baseState;
-  const state = meta.states.get(stateName);
+  if (!spriteInfo) return null;
+
+  // Determine effective RSI path (fallback to layer sprite if root rsiPath is empty)
+  let rsiPath = normalizeRsiPath(spriteInfo.rsiPath);
+  if (!rsiPath && spriteInfo.layers && spriteInfo.layers.length > 0) {
+    const lWithSprite = spriteInfo.layers.find((l) => l.sprite);
+    if (lWithSprite?.sprite) {
+      rsiPath = normalizeRsiPath(lWithSprite.sprite);
+    }
+  }
+  if (!rsiPath) return null;
+
+  let meta: RsiMeta;
+  try {
+    meta = await loadRsiMeta(rsiPath);
+  } catch {
+    return null;
+  }
+
+  // 1. Determine requested state name
+  const requestedState = stateOverride ?? spriteInfo.baseState;
+  let state = requestedState ? meta.states.get(requestedState) : undefined;
+
+  // 2. Fallbacks if state is not found
+  if (!state && spriteInfo.baseState && spriteInfo.baseState !== requestedState) {
+    state = meta.states.get(spriteInfo.baseState);
+  }
+
+  // 3. Fallback: check any layer state that exists in this RSI
+  if (!state && spriteInfo.layers && spriteInfo.layers.length > 0) {
+    for (const l of spriteInfo.layers) {
+      if (l.state && meta.states.has(l.state)) {
+        state = meta.states.get(l.state);
+        break;
+      }
+    }
+  }
+
+  // 4. Fallback: standard state names in SS14 / Monolith
+  if (!state) {
+    state = meta.states.get('space_artillery') ||
+            meta.states.get('icon') ||
+            meta.states.get('base') ||
+            meta.states.get('default') ||
+            meta.states.get('0') ||
+            meta.states.get('state0') ||
+            meta.states.get('idle');
+  }
+
+  // 5. Fallback: partial / prefix match
+  if (!state && requestedState) {
+    for (const [sName, sObj] of meta.states.entries()) {
+      if (sName.startsWith(requestedState) || sName.includes(requestedState) || requestedState.includes(sName)) {
+        state = sObj;
+        break;
+      }
+    }
+  }
+
+  // 6. Fallback: first available state in the RSI
+  if (!state && meta.states.size > 0) {
+    state = meta.states.values().next().value;
+  }
 
   if (!state) return null;
 
-  const image = await loadRsiStateImage(
-    spriteInfo.rsiPath,
-    stateName,
-  );
+  let image: HTMLImageElement;
+  try {
+    image = await loadRsiStateImage(
+      rsiPath,
+      state.name,
+    );
+  } catch {
+    return null;
+  }
 
   const dirOffset = getDirectionOffset(direction, state.directions);
 

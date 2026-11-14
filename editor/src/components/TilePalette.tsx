@@ -3,6 +3,7 @@ import type { PaletteItem } from '../types';
 import type { IPrototypeRegistry } from '../loaders/registryTypes';
 import { loadImage } from '../loaders/rsiLoader';
 import { getActiveProvider } from '../loaders/resourceProvider';
+import { normalizeTileSpritePath } from '../rendering/gridRenderer';
 
 interface Props {
   registry: IPrototypeRegistry | null;
@@ -101,13 +102,15 @@ const TileSwatch: React.FC<{ id: string; registry: IPrototypeRegistry | null }> 
     if (swatchUrlCache.has(id)) return; // already loaded or loading
 
     const tile = registry?.getTile(id);
-    if (!tile?.sprite) {
+    if (!tile) return;
+    const tileSprite = normalizeTileSpritePath(tile.sprite);
+    if (!tileSprite) {
       swatchUrlCache.set(id, null);
       return;
     }
 
     swatchUrlCache.set(id, null); // mark as loading
-    const url = getActiveProvider().getImageUrl(tile.sprite);
+    const url = getActiveProvider().getImageUrl(tileSprite);
     if (!url) return;
     loadImage(url)
       .then((img) => {
@@ -223,8 +226,9 @@ const TilePreviewPopup: React.FC<{
 }> = ({ tileId, registry, anchorRect }) => {
   const tile = registry.getTile(tileId);
   const imgSrc = (() => {
-    if (!tile?.sprite) return null;
-    try { return getActiveProvider().getImageUrl(tile.sprite); } catch { return null; }
+    const tileSprite = normalizeTileSpritePath(tile?.sprite);
+    if (!tileSprite) return null;
+    try { return getActiveProvider().getImageUrl(tileSprite); } catch { return null; }
   })();
 
   const left = anchorRect.left - PREVIEW_SIZE - 20;

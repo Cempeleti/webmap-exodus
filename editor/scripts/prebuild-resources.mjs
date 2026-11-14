@@ -30,6 +30,7 @@ const resourcesDirArg = process.argv.find(a => a.startsWith('--resources-dir='))
 const defaultResourcesPath =
   (resourcesDirArg && path.resolve(resourcesDirArg)) ||
   (process.env.MONOLITH_RESOURCES && path.resolve(process.env.MONOLITH_RESOURCES)) ||
+  (fs.existsSync(path.resolve(process.env.HOME || '', 'Documents/Monolith/Resources')) ? path.resolve(process.env.HOME || '', 'Documents/Monolith/Resources') : null) ||
   (fs.existsSync('D:/eexouds/a/Monolith/Resources') ? 'D:/eexouds/a/Monolith/Resources' : null) ||
   (fs.existsSync(path.resolve(projectRoot, '../../monolith/Resources')) ? path.resolve(projectRoot, '../../monolith/Resources') : null) ||
   path.resolve(projectRoot, '../../Resources');
@@ -39,9 +40,9 @@ const publicResources = path.join(projectRoot, 'public/resources');
 
 const TEXTURE_SETS = {
   none: [],
-  // Base SS14 texture directories. Fork-specific texture directories (under any
-  // discovered _Fork prefix) are appended automatically below.
-  minimal: ['Tiles', 'Structures', 'Markers', 'Decals'],
+  // Base SS14 texture directories. Includes Objects (ship guns, weapons, tools, devices),
+  // Structures, Tiles, Markers, Decals, Mobs, Clothing.
+  minimal: ['Tiles', 'Structures', 'Markers', 'Decals', 'Objects', 'Mobs', 'Clothing'],
   full: null, // copy entire Textures dir
 };
 
@@ -74,6 +75,9 @@ function copyDirRecursive(src, dest) {
     if (entry.isDirectory()) {
       count += copyDirRecursive(srcPath, destPath);
     } else {
+      if (fs.existsSync(destPath) && fs.statSync(destPath).isDirectory()) {
+        fs.rmSync(destPath, { recursive: true, force: true });
+      }
       fs.copyFileSync(srcPath, destPath);
       count++;
     }
@@ -208,6 +212,9 @@ console.log(`\nStep 3: Copying textures (mode: ${textureMode})...`);
 const textureSrc = path.join(resourcesRoot, 'Textures');
 const textureDest = path.join(publicResources, 'Textures');
 
+const staticResources = path.resolve(projectRoot, '../static/editor/resources');
+const staticTextureDest = path.join(staticResources, 'Textures');
+
 if (textureMode === 'full') {
   const count = copyDirRecursive(textureSrc, textureDest);
   console.log(`  Copied ${count} texture files`);
@@ -229,6 +236,76 @@ if (textureMode === 'full') {
     console.log(`  ${subdir}: ${count} files`);
     totalCount += count;
   }
+
+  // Guarantee that every single RSI referenced in monolith-registry.json is copied
+  const registryCandidates = [
+    path.resolve(projectRoot, '../static/editor/resources/monolith-registry.json'),
+    path.resolve(projectRoot, 'public/resources/monolith-registry.json'),
+  ];
+  const registryPath = registryCandidates.find(p => fs.existsSync(p));
+  if (registryPath) {
+    try {
+      const reg = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+      const referencedRsis = new Set();
+      for (const e of Object.values(reg.entities || {})) {
+        if (e.spriteInfo?.rsiPath) {
+          const clean = e.spriteInfo.rsiPath.trim().replace(/^[/\\\\]?Textures[/\\\\]/i, '').replace(/^[/\\\\]+/, '');
+          if (clean) referencedRsis.add(clean);
+        }
+        for (const l of e.spriteInfo?.layers || []) {
+          if (l.sprite) {
+            const clean = l.sprite.trim().replace(/^[/\\\\]?Textures[/\\\\]/i, '').replace(/^[/\\\\]+/, '');
+            if (clean) referencedRsis.add(clean);
+          }
+        }
+      }
+      for (const d of Object.values(reg.decals || {})) {
+        if (d.rsiPath) {
+          const clean = d.rsiPath.trim().replace(/^[/\\\\]?Textures[/\\\\]/i, '').replace(/^[/\\\\]+/, '');
+          if (clean) referencedRsis.add(clean);
+        }
+      }
+      for (const t of Object.values(reg.tiles || {})) {
+        if (t.sprite) {
+          const clean = t.sprite.trim().replace(/^[/\\\\]?Textures[/\\\\]/i, '').replace(/^[/\\\\]+/, '');
+          if (clean) referencedRsis.add(clean);
+        }
+      }
+
+      let extraCount = 0;
+      for (const rsi of referencedRsis) {
+        const srcRsiDir = path.join(textureSrc, rsi);
+        const destRsiDir = path.join(textureDest, rsi);
+        if (fs.existsSync(srcRsiDir)) {
+          const stat = fs.statSync(srcRsiDir);
+          if (stat.isDirectory()) {
+            if (!fs.existsSync(destRsiDir) || !fs.existsSync(path.join(destRsiDir, 'meta.json'))) {
+              extraCount += copyDirRecursive(srcRsiDir, destRsiDir);
+            }
+          } else {
+            if (!fs.existsSync(destRsiDir)) {
+              fs.mkdirSync(path.dirname(destRsiDir), { recursive: true });
+              fs.copyFileSync(srcRsiDir, destRsiDir);
+              extraCount++;
+            }
+          }
+        }
+      }
+      if (extraCount > 0) {
+        console.log(`  Referenced RSIs: copied ${extraCount} extra texture files`);
+        totalCount += extraCount;
+      }
+    } catch (e) {
+      console.warn(`  Warning: failed to scan referenced RSIs: ${e.message}`);
+    }
+  }
+
+  // Also sync Textures into static/editor/resources/Textures
+  if (fs.existsSync(staticResources)) {
+    console.log(`\nSyncing textures to ${staticTextureDest}...`);
+    copyDirRecursive(textureDest, staticTextureDest);
+  }
+
   console.log(`  Total: ${totalCount} texture files`);
 }
 

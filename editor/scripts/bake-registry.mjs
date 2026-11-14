@@ -54,6 +54,7 @@ const resourcesDirArg = process.argv.find(a => a.startsWith('--resources-dir='))
 const defaultResourcesPath =
   (resourcesDirArg && path.resolve(resourcesDirArg)) ||
   (process.env.MONOLITH_RESOURCES && path.resolve(process.env.MONOLITH_RESOURCES)) ||
+  (fs.existsSync(path.resolve(process.env.HOME || '', 'Documents/Monolith/Resources')) ? path.resolve(process.env.HOME || '', 'Documents/Monolith/Resources') : null) ||
   (fs.existsSync('D:/eexouds/a/Monolith/Resources') ? 'D:/eexouds/a/Monolith/Resources' : null) ||
   (fs.existsSync(path.resolve(projectRoot, '../../monolith/Resources')) ? path.resolve(projectRoot, '../../monolith/Resources') : null) ||
   path.resolve(projectRoot, '../../Resources');
@@ -129,6 +130,15 @@ function inferSmoothMode(iconSmoothComp) {
   return 'Corners';
 }
 
+function normalizeRsiPath(rsiPath) {
+  if (!rsiPath) return '';
+  return String(rsiPath)
+    .trim()
+    .replace(/^[/\\\\]?Textures[/\\\\]/i, '')
+    .replace(/^[/\\\\]+/, '')
+    .replace(/\\/g, '/');
+}
+
 function extractSpriteInfo(components) {
   const spriteComp = components.find(c => c.type === 'Sprite');
   if (!spriteComp) return null;
@@ -136,7 +146,7 @@ function extractSpriteInfo(components) {
   const rawLayers = spriteComp.layers ?? [];
   const layers = rawLayers.map(l => ({
     state: l.state ?? '',
-    sprite: l.sprite,
+    sprite: l.sprite ? normalizeRsiPath(l.sprite) : undefined,
     map: l.map,
     visible: l.visible,
     shader: l.shader,
@@ -145,10 +155,37 @@ function extractSpriteInfo(components) {
   }));
 
   const iconSmoothComp = components.find(c => c.type === 'IconSmooth');
-  const baseState = spriteComp.state ?? (layers[0]?.state ?? '');
+
+  // RSI path: top-level sprite or fallback to first visible layer's sprite
+  let rsiPath = spriteComp.sprite ? normalizeRsiPath(spriteComp.sprite) : '';
+  if (!rsiPath && layers.length > 0) {
+    for (const l of layers) {
+      if (l.sprite && l.visible !== false) {
+        rsiPath = l.sprite;
+        break;
+      }
+    }
+    if (!rsiPath && layers[0]?.sprite) {
+      rsiPath = layers[0].sprite;
+    }
+  }
+
+  // baseState: prefer direct state, or first visible layer's state
+  let baseState = spriteComp.state ?? '';
+  if (!baseState && layers.length > 0) {
+    for (const l of layers) {
+      if (l.state && l.visible !== false) {
+        baseState = l.state;
+        break;
+      }
+    }
+    if (!baseState && layers[0]?.state) {
+      baseState = layers[0].state;
+    }
+  }
 
   return {
-    rsiPath: spriteComp.sprite ?? '',
+    rsiPath,
     baseState,
     drawDepth: spriteComp.drawdepth ?? spriteComp.drawDepth,
     noRot: spriteComp.noRot,
@@ -238,10 +275,15 @@ function resolveEntities(entries) {
 function resolveTiles(rawTiles) {
   const result = new Map();
   for (const raw of rawTiles) {
+    let sprite = raw.sprite ?? null;
+    if (sprite) {
+      const clean = String(sprite).replace(/\\/g, '/').replace(/^\/+/, '');
+      sprite = clean.startsWith('Textures/') ? `/${clean}` : `/Textures/${clean}`;
+    }
     result.set(raw.id, {
       id: raw.id,
       name: String(raw.name ?? raw.id),
-      sprite: raw.sprite ?? null,
+      sprite,
       variants: raw.variants ?? 1,
       isSubfloor: raw.isSubfloor ?? true,
       isSpace: raw.isSpace ?? false,
@@ -289,7 +331,7 @@ function resolveDecals(rawDecals) {
     let defaultCustomColor = false;
 
     for (const proto of chain) {
-      if (proto.sprite?.sprite) rsiPath = proto.sprite.sprite;
+      if (proto.sprite?.sprite) rsiPath = normalizeRsiPath(proto.sprite.sprite);
       if (proto.sprite?.state) state = proto.sprite.state;
       if (proto.tags) tags = proto.tags;
       if (proto.snapCardinals !== undefined) snapCardinals = proto.snapCardinals;

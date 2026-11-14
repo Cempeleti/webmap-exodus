@@ -160,6 +160,16 @@ export function clearTileImageCache(): void {
 }
 
 /**
+ * Normalizes a tile sprite path to guarantee it starts with '/Textures/'.
+ * Tile sprites are PNG files located under Textures/ (e.g. '/Textures/Tiles/steel.png').
+ */
+export function normalizeTileSpritePath(sprite: string | null | undefined): string | null {
+  if (!sprite) return null;
+  const clean = sprite.replace(/\\/g, '/').replace(/^\/+/, '');
+  return clean.startsWith('Textures/') ? `/${clean}` : `/Textures/${clean}`;
+}
+
+/**
  * Retrieve a cached tile image synchronously.
  * If the image hasn't been requested yet, kicks off an async load and
  * returns null (the next render frame will pick it up once loaded).
@@ -171,7 +181,8 @@ function getTileImage(
   if (tileImageCache.has(tileId)) return tileImageCache.get(tileId)!;
 
   const tile = registry.getTile(tileId);
-  if (!tile || !tile.sprite) {
+  const tileSprite = normalizeTileSpritePath(tile?.sprite);
+  if (!tileSprite) {
     tileImageCache.set(tileId, null);
     return null;
   }
@@ -180,7 +191,7 @@ function getTileImage(
   tileImageCache.set(tileId, null);
 
   const provider = getActiveProvider();
-  const url = provider.getImageUrl(tile.sprite);
+  const url = provider.getImageUrl(tileSprite);
   if (!url) {
     return null;
   }
