@@ -3,6 +3,7 @@ import type { ShuttleSnapshotResult } from '../rendering/shuttleSnapshotRenderer
 import type { EditorState } from '../state/editorState';
 import { exportMap } from '../export/mapExporter';
 import { createShuttleShareLink } from '../services/shareService';
+import { saveSnapshotToGallery } from '../services/galleryService';
 
 interface Props {
   snapshot: ShuttleSnapshotResult;
@@ -31,6 +32,25 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [savedToGallery, setSavedToGallery] = useState(false);
+  const [savedGalleryId, setSavedGalleryId] = useState<string | null>(null);
+
+  const handleSaveToGallery = () => {
+    try {
+      const item = saveSnapshotToGallery(
+        snapshot,
+        state,
+        shuttleName,
+        shareUrl || undefined,
+        shareExpiresAt || undefined,
+      );
+      setSavedGalleryId(item.id);
+      setSavedToGallery(true);
+      setTimeout(() => setSavedToGallery(false), 4000);
+    } catch (e) {
+      alert(`Не удалось сохранить в галерею: ${e}`);
+    }
+  };
 
   const handleDownloadPng = () => {
     const filename = `${shuttleName.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'shuttle'}-0.png`;
@@ -278,12 +298,34 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
               )}
 
               <p className="text-[11px] text-[#8292ab] leading-relaxed">
-                Шаттл рендерится изолированно и не сохраняется в постоянную базу данных сайта.
+                Шаттл можно сохранить в личную галерею браузера или поделиться временной ссылкой.
               </p>
             </div>
 
             {/* Actions */}
             <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={handleSaveToGallery}
+                className="w-full py-2.5 px-3 bg-[#10b981] hover:bg-[#059669] text-white font-semibold text-xs rounded-lg shadow-md shadow-emerald-950/40 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>⭐</span>
+                <span>{savedToGallery ? 'Сохранено в галерею!' : 'Сохранить в галерею'}</span>
+              </button>
+
+              {savedGalleryId && (
+                <div className="flex items-center justify-between px-2.5 py-1.5 bg-emerald-950/50 border border-emerald-800/60 rounded text-[11px] text-emerald-200 animate-in fade-in">
+                  <span>Добавлено в вашу галерею</span>
+                  <a
+                    href="../gallery"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline text-emerald-300 hover:text-white"
+                  >
+                    Перейти в галерею ↗
+                  </a>
+                </div>
+              )}
+
               <button
                 onClick={handleShare}
                 disabled={isSharing}

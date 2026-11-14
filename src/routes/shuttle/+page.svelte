@@ -4,9 +4,11 @@
 	import {
 		formatPrice,
 		getShuttleById,
+		getUserGalleryItem,
 		shuttleConfig,
 		shuttleGroupColors,
 		type Shuttle,
+		type ShuttleHullClass,
 		type ShuttleSize
 	} from '$lib';
 	import { page } from '$app/state';
@@ -20,18 +22,49 @@
 	let customShuttle = $state<Shuttle | null>(null);
 
 	let id = $derived(browser ? (page.url.searchParams.get('id') ?? '') : '');
+	let galleryIdParam = $derived(browser ? (page.url.searchParams.get('galleryId') ?? '') : '');
 	let shareParam = $derived(browser ? (page.url.searchParams.get('share') ?? '') : '');
 	let imgParam = $derived(browser ? (page.url.searchParams.get('img') ?? '') : '');
 
 	let isShared = $derived(
 		Boolean(shareParam || imgParam || (id === 'custom' && customShuttle?.isShared))
 	);
-	let isCustom = $derived(id === 'custom' || Boolean(shareParam) || Boolean(imgParam));
+	let isCustom = $derived(
+		id === 'custom' || Boolean(galleryIdParam) || Boolean(shareParam) || Boolean(imgParam)
+	);
 
 	$effect(() => {
 		if (!browser) return;
 
-		// 1. Shared shuttle via URL query
+		// 1. User gallery item
+		if (galleryIdParam) {
+			const item = getUserGalleryItem(galleryIdParam);
+			if (item) {
+				customShuttle = {
+					id: item.id,
+					name: item.name,
+					description: item.description,
+					price: 0,
+					group: 'custom',
+					hullClass: (item.hullClass as ShuttleHullClass) || 'shuttle',
+					size: item.size,
+					classes: ['civilian'],
+					engines: ['plasma'],
+					image: item.image,
+					tileWidth: item.tileWidth,
+					tileHeight: item.tileHeight,
+					entityCount: item.entityCount,
+					yamlUrl: item.shareUrl,
+					yamlContent: item.yamlContent,
+					createdAt: item.createdAt,
+					expiresAt: item.shareExpiresAt,
+					isShared: false
+				};
+				return;
+			}
+		}
+
+		// 2. Shared shuttle via URL query
 		if (shareParam || imgParam) {
 			const nameParam = page.url.searchParams.get('name');
 			const descParam = page.url.searchParams.get('desc');
@@ -170,6 +203,28 @@
 		a.click();
 		document.body.removeChild(a);
 	}
+
+	function handleDownloadYaml() {
+		if (!shuttle?.yamlContent) return;
+		const blob = new Blob([shuttle.yamlContent], { type: 'text/yaml;charset=utf-8' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${(shuttle.name || 'shuttle').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.yml`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+
+	function handleEditGalleryShuttle() {
+		if (shuttle?.yamlContent) {
+			sessionStorage.setItem('editor_load_yaml', shuttle.yamlContent);
+			window.location.href = resolve('/editor?loadSession=1');
+		} else if (shuttle?.yamlUrl) {
+			window.location.href = resolve(`/editor?loadUrl=${encodeURIComponent(shuttle.yamlUrl)}`);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -236,7 +291,10 @@
 			<div class="breadcrumb" aria-label="Навигационная цепочка">
 				<a href={resolve('/')} class="bc-link">Каталог</a>
 				<span aria-hidden="true">/</span>
-				{#if isShared}
+				{#if galleryIdParam}
+					<a href={resolve('/gallery')} class="bc-link">Моя галерея</a>
+					<span aria-hidden="true">/</span>
+				{:else if isShared}
 					<span class="bc-link">Общий рендер</span>
 					<span aria-hidden="true">/</span>
 				{/if}
@@ -461,7 +519,38 @@
 						</button>
 					{/if}
 
-					{#if shuttle.yamlUrl}
+					{#if shuttle.yamlContent}
+						<button
+							type="button"
+							class="download-action-btn"
+							onclick={handleDownloadYaml}
+							title="Скачать файл карты SS14 Grid"
+						>
+							<svg
+								width="15"
+								height="15"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+								<polyline points="14 2 14 8 20 8" />
+								<line x1="12" y1="18" x2="12" y2="12" />
+								<line x1="9" y1="15" x2="15" y2="15" />
+							</svg>
+							Скачать .yml
+						</button>
+						<button
+							type="button"
+							class="edit-link"
+							onclick={handleEditGalleryShuttle}
+						>
+							Редактировать в редакторе
+						</button>
+					{:else if shuttle.yamlUrl}
 						<a
 							class="download-action-btn"
 							href={shuttle.yamlUrl}
@@ -561,6 +650,8 @@
 		border: 1px solid var(--accent);
 		border-radius: var(--radius);
 		color: var(--accent);
+		background: transparent;
+		cursor: pointer;
 		font-family: var(--font-display);
 		font-size: 0.875rem;
 		font-weight: 600;

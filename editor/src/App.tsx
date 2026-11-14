@@ -297,18 +297,80 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // The catalog can open the editor with ?shuttle=<id> or ?loadUrl=<url>.
-  // Generated webmap builds publish matching YAML files under ./maps/by-id/.
+  // The catalog can open the editor with:
+  // 1. ?loadSession=1 (from sessionStorage 'editor_load_yaml')
+  // 2. ?galleryId=<id> (from localStorage 'webmap_user_gallery')
+  // 3. ?shuttle=<id> (from ./maps/by-id/<id>.yml)
+  // 4. ?loadUrl=<url> or ?mapUrl=<url> (from remote URL)
   useEffect(() => {
     if (!state.registry || !forkProvider || webmapLoadStartedRef.current) return;
 
     const searchParams = new URLSearchParams(window.location.search);
+    const loadSession = searchParams.get('loadSession');
+    const galleryId = searchParams.get('galleryId');
     const shuttleId = searchParams.get('shuttle');
     const loadUrl = searchParams.get('loadUrl') || searchParams.get('mapUrl');
-    if (!shuttleId && !loadUrl) return;
+
+    if (!loadSession && !galleryId && !shuttleId && !loadUrl) return;
+
+    // 1. Load from sessionStorage
+    if (loadSession) {
+      try {
+        const sessionYaml = sessionStorage.getItem('editor_load_yaml');
+        if (sessionYaml) {
+          webmapLoadStartedRef.current = true;
+          handleImport(sessionYaml);
+          setStatusMessage('Шаттл загружен из пользовательской галереи');
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to read session YAML:', e);
+      }
+    }
+
+    // 2. Load from localStorage user gallery
+    if (galleryId) {
+      try {
+        const raw = localStorage.getItem('webmap_user_gallery');
+        if (raw) {
+          const items = JSON.parse(raw);
+          const item = Array.isArray(items) ? items.find((i: any) => i.id === galleryId) : null;
+          if (item?.yamlContent) {
+            webmapLoadStartedRef.current = true;
+            handleImport(item.yamlContent);
+            setStatusMessage(`Шаттл «${item.name}» загружен из вашей галереи`);
+            return;
+          }
+          if (item?.shareUrl) {
+            webmapLoadStartedRef.current = true;
+            fetch(item.shareUrl)
+              .then(res => res.json())
+              .then(manifest => {
+                if (manifest?.yamlUrl) {
+                  return fetch(manifest.yamlUrl).then(r => r.text());
+                }
+                throw new Error('YAML link missing in share manifest');
+              })
+              .then(content => {
+                handleImport(content);
+                setStatusMessage(`Шаттл «${item.name}» загружен из галереи`);
+              })
+              .catch(err => {
+                setStatusMessage(`Не удалось загрузить шаттл из галереи: ${err}`);
+              });
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to read gallery item:', e);
+      }
+    }
+
+    // 3. Load from URL (remote or local vanilla map)
+    const targetUrl = loadUrl || (shuttleId ? `./maps/by-id/${encodeURIComponent(shuttleId)}.yml` : null);
+    if (!targetUrl) return;
 
     webmapLoadStartedRef.current = true;
-    const targetUrl = loadUrl || `./maps/by-id/${encodeURIComponent(shuttleId!)}.yml`;
 
     fetch(targetUrl)
       .then(async response => {

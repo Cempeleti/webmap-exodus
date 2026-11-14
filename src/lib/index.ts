@@ -24,6 +24,8 @@ export interface Shuttle {
 	tileHeight?: number;
 	entityCount?: number;
 	yamlUrl?: string;
+	yamlContent?: string;
+	createdAt?: string;
 	expiresAt?: string;
 	isShared?: boolean;
 }
@@ -203,3 +205,6 @@ export const shuttleGroupColors: Record<string, string> = {
 	mieyo: configJson.shipyard.mms,
 	company: configJson.shipyard.companies
 };
+
+export * from './userGallery';
+

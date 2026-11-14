@@ -561,9 +561,14 @@ export function generateShuttles(monolithDir, repoDir) {
 
 // CLI execution
 if (process.argv[1] && process.argv[1].endsWith('generate-shuttles.js')) {
+	const homeMonolith = path.resolve(process.env.HOME || '', 'Documents/Monolith');
 	const monolithDir =
 		process.argv[2] ||
-		(fs.existsSync('D:/eexouds/a/Monolith') ? 'D:/eexouds/a/Monolith' : '../monolith');
+		(fs.existsSync(homeMonolith)
+			? homeMonolith
+			: fs.existsSync('D:/eexouds/a/Monolith')
+				? 'D:/eexouds/a/Monolith'
+				: '../monolith');
 	const currentRepoDir = process.argv[3] || '.';
 	generateShuttles(monolithDir, currentRepoDir);
 }
