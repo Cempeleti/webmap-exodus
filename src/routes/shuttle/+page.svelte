@@ -1,18 +1,112 @@
 <script lang="ts">
 	import Button from '$lib/button.svelte';
 	import ImageModal from '$lib/image-modal.svelte';
-	import { formatPrice, getShuttleById, shuttleConfig, shuttleGroupColors } from '$lib';
+	import {
+		formatPrice,
+		getShuttleById,
+		shuttleConfig,
+		shuttleGroupColors,
+		type Shuttle,
+		type ShuttleSize
+	} from '$lib';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
 	import { browser } from '$app/environment';
 	import configJson from '$root/config.json' with { type: 'json' };
 
 	let isModalOpen = $state(false);
+	let shareCopied = $state(false);
+	let isLoadingShared = $state(false);
+	let customShuttle = $state<Shuttle | null>(null);
+
 	let id = $derived(browser ? (page.url.searchParams.get('id') ?? '') : '');
-	let customShuttle = $state<import('$lib').Shuttle | null>(null);
+	let shareParam = $derived(browser ? (page.url.searchParams.get('share') ?? '') : '');
+	let imgParam = $derived(browser ? (page.url.searchParams.get('img') ?? '') : '');
+
+	let isShared = $derived(
+		Boolean(shareParam || imgParam || (id === 'custom' && customShuttle?.isShared))
+	);
+	let isCustom = $derived(id === 'custom' || Boolean(shareParam) || Boolean(imgParam));
 
 	$effect(() => {
-		if (browser && id === 'custom') {
+		if (!browser) return;
+
+		// 1. Shared shuttle via URL query
+		if (shareParam || imgParam) {
+			const nameParam = page.url.searchParams.get('name');
+			const descParam = page.url.searchParams.get('desc');
+			const sizeParam = (page.url.searchParams.get('size') as ShuttleSize) || 'small';
+			const w = Number(page.url.searchParams.get('w')) || undefined;
+			const h = Number(page.url.searchParams.get('h')) || undefined;
+			const e = Number(page.url.searchParams.get('e')) || undefined;
+			const yamlParam = page.url.searchParams.get('yaml') || undefined;
+			const expParam = page.url.searchParams.get('exp') || undefined;
+
+			customShuttle = {
+				id: 'shared',
+				name: nameParam || 'Пользовательский шаттл',
+				description:
+					descParam ||
+					(w && h
+						? `Пользовательский шаттл (${w}×${h} тайлов, сущностей: ${e ?? '—'}).`
+						: 'Пользовательский шаттл, созданный в редакторе карт.'),
+				price: 0,
+				group: 'custom',
+				hullClass: 'shuttle',
+				size: sizeParam,
+				classes: ['civilian'],
+				engines: ['plasma'],
+				image: imgParam || '',
+				tileWidth: w,
+				tileHeight: h,
+				entityCount: e,
+				yamlUrl: yamlParam,
+				expiresAt: expParam,
+				isShared: true
+			};
+
+			// If manifest link is provided, fetch complete details in background
+			if (shareParam) {
+				const manifestUrl =
+					shareParam.startsWith('http://') || shareParam.startsWith('https://')
+						? shareParam
+						: `https://trystocare.com/${shareParam}`;
+
+				isLoadingShared = true;
+				fetch(manifestUrl)
+					.then((res) => {
+						if (!res.ok) throw new Error(`HTTP ${res.status}`);
+						return res.json();
+					})
+					.then((manifest) => {
+						if (manifest && customShuttle) {
+							customShuttle = {
+								...customShuttle,
+								name: manifest.name || customShuttle.name,
+								description: manifest.description || customShuttle.description,
+								image: manifest.imageUrl || customShuttle.image,
+								yamlUrl: manifest.yamlUrl || customShuttle.yamlUrl,
+								tileWidth: manifest.tileWidth ?? customShuttle.tileWidth,
+								tileHeight: manifest.tileHeight ?? customShuttle.tileHeight,
+								entityCount: manifest.entityCount ?? customShuttle.entityCount,
+								size: manifest.size || customShuttle.size,
+								expiresAt: manifest.expiresAt || customShuttle.expiresAt,
+								isShared: true
+							};
+						}
+					})
+					.catch((err) => {
+						console.warn('Failed to load shared manifest:', err);
+					})
+					.finally(() => {
+						isLoadingShared = false;
+					});
+			}
+			return;
+		}
+
+		// 2. Local sessionStorage preview from editor
+		if (id === 'custom') {
 			try {
 				const raw = sessionStorage.getItem('custom_preview_shuttle');
 				if (raw) {
@@ -21,22 +115,61 @@
 			} catch (e) {
 				console.error('Failed to parse custom shuttle preview:', e);
 			}
-		} else {
-			customShuttle = null;
+			return;
 		}
+
+		customShuttle = null;
 	});
 
-	let shuttle = $derived(id === 'custom' ? customShuttle : getShuttleById(id));
+	let shuttle = $derived(isCustom ? customShuttle : getShuttleById(id));
 	let factionColor = $derived(
-		shuttle ? (shuttleGroupColors[shuttle.group] ?? '#0B9FC0') : '#0B9FC0'
+		shuttle ? (shuttleGroupColors[shuttle.group] ?? '#00adb5') : '#00adb5'
 	);
 	let imageSrc = $derived(
-		shuttle?.image?.startsWith('data:')
+		shuttle?.image?.startsWith('data:') ||
+			shuttle?.image?.startsWith('http://') ||
+			shuttle?.image?.startsWith('https://')
 			? shuttle.image
 			: shuttle
 				? asset(shuttle.image as `/${string}`)
 				: ''
 	);
+
+	function formatExpiration(isoDateStr?: string): string {
+		if (!isoDateStr) return '';
+		try {
+			const d = new Date(isoDateStr);
+			return d.toLocaleString('ru-RU', {
+				day: '2-digit',
+				month: '2-digit',
+				year: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit'
+			});
+		} catch {
+			return isoDateStr;
+		}
+	}
+
+	async function handleCopyShareLink() {
+		try {
+			await navigator.clipboard.writeText(window.location.href);
+			shareCopied = true;
+			setTimeout(() => (shareCopied = false), 2500);
+		} catch (e) {
+			console.error('Failed to copy share link:', e);
+		}
+	}
+
+	function handleDownloadImage() {
+		if (!imageSrc) return;
+		const a = document.createElement('a');
+		a.href = imageSrc;
+		a.download = `${(shuttle?.name || 'shuttle').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}-render.png`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+	}
 </script>
 
 <svelte:head>
@@ -103,6 +236,10 @@
 			<div class="breadcrumb" aria-label="Навигационная цепочка">
 				<a href={resolve('/')} class="bc-link">Каталог</a>
 				<span aria-hidden="true">/</span>
+				{#if isShared}
+					<span class="bc-link">Общий рендер</span>
+					<span aria-hidden="true">/</span>
+				{/if}
 				<span class="bc-current">{shuttle.name}</span>
 			</div>
 		</div>
@@ -116,6 +253,24 @@
 					<div class="title-row">
 						<h1 class="shuttle-name">{shuttle.name}</h1>
 						<div class="title-tags">
+							{#if isShared}
+								<span class="shared-badge">
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+										<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+									</svg>
+									Временная ссылка
+								</span>
+							{/if}
 							{#if shuttle.voucher}
 								<span class="voucher-badge-detail">
 									<span class="voucher-icon" aria-hidden="true">🎫</span>
@@ -128,10 +283,19 @@
 								</span>
 							{/if}
 							<span class="faction-tag" style="color: {factionColor}">
-								{shuttleConfig.shipyard[shuttle.group]}
+								{shuttleConfig.shipyard[shuttle.group] ?? shuttle.group}
 							</span>
 						</div>
 					</div>
+
+					{#if shuttle.expiresAt}
+						<div class="expiration-banner">
+							<span class="exp-icon">⏳</span>
+							<span
+								>Ссылка активна до: <strong>{formatExpiration(shuttle.expiresAt)}</strong> (хранится 3 дня)</span
+							>
+						</div>
+					{/if}
 
 					{#if shuttle.description}
 						<p class="shuttle-desc">{shuttle.description}</p>
@@ -162,7 +326,7 @@
 								</span>
 							{:else}
 								<span class="stat-value" style="color: var(--text-dim); font-size: 0.85rem;"
-									>Не продаётся</span
+									>{isShared ? 'Пользовательский' : 'Не продаётся'}</span
 								>
 							{/if}
 						</div>
@@ -182,6 +346,22 @@
 							<span class="stat-label">Размер</span>
 							<span class="stat-value">{shuttleConfig.sizes[shuttle.size] ?? shuttle.size}</span>
 						</div>
+
+						<!-- Dimensions -->
+						{#if shuttle.tileWidth && shuttle.tileHeight}
+							<div class="stat-block">
+								<span class="stat-label">Разрешение</span>
+								<span class="stat-value font-mono">{shuttle.tileWidth} × {shuttle.tileHeight} тайлов</span>
+							</div>
+						{/if}
+
+						<!-- Entities count -->
+						{#if shuttle.entityCount}
+							<div class="stat-block">
+								<span class="stat-label">Сущностей</span>
+								<span class="stat-value font-mono">{shuttle.entityCount}</span>
+							</div>
+						{/if}
 
 						<!-- Engines -->
 						{#if shuttle.engines && shuttle.engines.length > 0}
@@ -230,7 +410,90 @@
 				<!-- Action -->
 				<div class="action-row">
 					<Button text="Вернуться в каталог" onClick={() => window.history.back()} />
-					{#if shuttle.mapPath}
+
+					<button
+						type="button"
+						class="share-action-btn"
+						onclick={handleCopyShareLink}
+						title="Скопировать ссылку на этот шаттл"
+					>
+						<svg
+							width="15"
+							height="15"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<circle cx="18" cy="5" r="3" />
+							<circle cx="6" cy="12" r="3" />
+							<circle cx="18" cy="19" r="3" />
+							<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+							<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+						</svg>
+						{shareCopied ? 'Ссылка скопирована!' : 'Поделиться'}
+					</button>
+
+					{#if imageSrc}
+						<button
+							type="button"
+							class="download-action-btn"
+							onclick={handleDownloadImage}
+							title="Скачать изображение рендера"
+						>
+							<svg
+								width="15"
+								height="15"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+								<polyline points="7 10 12 15 17 10" />
+								<line x1="12" y1="15" x2="12" y2="3" />
+							</svg>
+							Скачать PNG
+						</button>
+					{/if}
+
+					{#if shuttle.yamlUrl}
+						<a
+							class="download-action-btn"
+							href={shuttle.yamlUrl}
+							download={`${(shuttle.name || 'shuttle').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.yml`}
+							target="_blank"
+							rel="noopener noreferrer"
+							title="Скачать файл карты SS14 Grid"
+						>
+							<svg
+								width="15"
+								height="15"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+								<polyline points="14 2 14 8 20 8" />
+								<line x1="12" y1="18" x2="12" y2="12" />
+								<line x1="9" y1="15" x2="15" y2="15" />
+							</svg>
+							Скачать .yml
+						</a>
+						<a
+							class="edit-link"
+							href={resolve(`/editor?loadUrl=${encodeURIComponent(shuttle.yamlUrl)}`)}
+						>
+							Редактировать в редакторе
+						</a>
+					{:else if shuttle.mapPath}
 						<a
 							class="edit-link"
 							href={resolve(`/editor?shuttle=${encodeURIComponent(shuttle.id)}`)}
@@ -584,6 +847,65 @@
 		font-size: 0.72rem;
 		color: var(--text-dim);
 		letter-spacing: 0.02em;
+	}
+
+	.shared-badge {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		padding: 4px 10px;
+		border-radius: var(--radius-sm);
+		background: rgba(14, 165, 233, 0.15);
+		color: #38bdf8;
+		border: 1px solid rgba(14, 165, 233, 0.45);
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.expiration-banner {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 14px;
+		border-radius: var(--radius-sm);
+		background: rgba(14, 165, 233, 0.08);
+		border: 1px solid rgba(14, 165, 233, 0.25);
+		font-size: 0.8rem;
+		color: #93c5fd;
+	}
+
+	.share-action-btn,
+	.download-action-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 8px 16px;
+		border: 1px solid var(--border-dim);
+		border-radius: var(--radius);
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text-muted);
+		font-family: var(--font-display);
+		font-size: 0.875rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-decoration: none;
+		cursor: pointer;
+		outline: none;
+		transition:
+			background 0.2s,
+			color 0.2s,
+			border-color 0.2s;
+	}
+
+	.share-action-btn:hover,
+	.download-action-btn:hover {
+		background: rgba(14, 165, 233, 0.12);
+		border-color: rgba(14, 165, 233, 0.4);
+		color: #38bdf8;
 	}
 
 	/* Image panel */

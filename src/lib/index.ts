@@ -20,6 +20,12 @@ export interface Shuttle {
 	image: string;
 	mapPath?: string;
 	voucher?: boolean;
+	tileWidth?: number;
+	tileHeight?: number;
+	entityCount?: number;
+	yamlUrl?: string;
+	expiresAt?: string;
+	isShared?: boolean;
 }
 
 export type ShuttleSort = 'default' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc';

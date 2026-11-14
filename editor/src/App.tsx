@@ -297,29 +297,34 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // The catalog can open the editor with ?shuttle=<id>. Generated webmap
-  // builds publish matching YAML files under ./maps/by-id/.
+  // The catalog can open the editor with ?shuttle=<id> or ?loadUrl=<url>.
+  // Generated webmap builds publish matching YAML files under ./maps/by-id/.
   useEffect(() => {
     if (!state.registry || !forkProvider || webmapLoadStartedRef.current) return;
 
-    const shuttleId = new URLSearchParams(window.location.search).get('shuttle');
-    if (!shuttleId) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const shuttleId = searchParams.get('shuttle');
+    const loadUrl = searchParams.get('loadUrl') || searchParams.get('mapUrl');
+    if (!shuttleId && !loadUrl) return;
 
     webmapLoadStartedRef.current = true;
-    const mapUrl = `./maps/by-id/${encodeURIComponent(shuttleId)}.yml`;
-    fetch(mapUrl)
+    const targetUrl = loadUrl || `./maps/by-id/${encodeURIComponent(shuttleId!)}.yml`;
+
+    fetch(targetUrl)
       .then(async response => {
         if (!response.ok) {
-          throw new Error(`Webmap YAML not found (${response.status})`);
+          throw new Error(`YAML map not found (${response.status})`);
         }
         return response.text();
       })
       .then(content => {
         handleImport(content);
-        setStatusMessage(`Открыт шаттл из вебмапа: ${shuttleId}`);
+        setStatusMessage(
+          loadUrl ? 'Шаттл загружен по ссылке' : `Открыт шаттл из вебмапа: ${shuttleId}`,
+        );
       })
       .catch(error => {
-        setStatusMessage(`Не удалось открыть шаттл из вебмапа: ${error}`);
+        setStatusMessage(`Не удалось открыть шаттл: ${error}`);
       });
   }, [forkProvider, handleImport, state.registry]);
 

@@ -6,8 +6,13 @@
 	let editorUrl = $state(`${base}/editor/index.html`);
 
 	onMount(() => {
-		const shuttleId = new URLSearchParams(window.location.search).get('shuttle');
-		if (shuttleId) {
+		const searchParams = new URLSearchParams(window.location.search);
+		const shuttleId = searchParams.get('shuttle');
+		const loadUrl = searchParams.get('loadUrl') || searchParams.get('mapUrl');
+
+		if (loadUrl) {
+			editorUrl = `${base}/editor/index.html?loadUrl=${encodeURIComponent(loadUrl)}`;
+		} else if (shuttleId) {
 			editorUrl = `${base}/editor/index.html?shuttle=${encodeURIComponent(shuttleId)}`;
 		}
 	});

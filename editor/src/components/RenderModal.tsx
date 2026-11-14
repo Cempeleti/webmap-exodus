@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { ShuttleSnapshotResult } from '../rendering/shuttleSnapshotRenderer';
 import type { EditorState } from '../state/editorState';
 import { exportMap } from '../export/mapExporter';
+import { createShuttleShareLink } from '../services/shareService';
 
 interface Props {
   snapshot: ShuttleSnapshotResult;
@@ -25,6 +26,11 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
   const activeGrid = state.grids[state.activeGridIndex];
   const [shuttleName, setShuttleName] = useState(activeGrid?.name || 'shuttle');
   const [copied, setCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const handleDownloadPng = () => {
     const filename = `${shuttleName.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'shuttle'}-0.png`;
@@ -61,6 +67,11 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
   };
 
   const handleOpenInWebmap = () => {
+    if (shareUrl) {
+      window.open(shareUrl, '_blank');
+      return;
+    }
+
     // Estimate size category
     let sizeCategory = 'small';
     const tileArea = snapshot.tileWidth * snapshot.tileHeight;
@@ -78,7 +89,7 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
       hullClass: 'shuttle',
       size: sizeCategory,
       classes: ['civilian'],
-      engines: ['thruster'],
+      engines: ['plasma'],
       image: snapshot.dataUrl,
       voucher: false,
     };
@@ -105,6 +116,42 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
       }
     } catch (e) {
       alert(`Не удалось скопировать изображение: ${e}`);
+    }
+  };
+
+  const handleShare = async () => {
+    setIsSharing(true);
+    setShareError(null);
+    try {
+      const result = await createShuttleShareLink(snapshot, state, shuttleName);
+      setShareUrl(result.shareUrl);
+      setShareExpiresAt(result.expiresAt);
+
+      if (navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(result.shareUrl);
+          setShareCopied(true);
+          setTimeout(() => setShareCopied(false), 3000);
+        } catch {
+          // ignore clipboard auto-copy denial
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setShareError(msg || 'Не удалось создать временную ссылку');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch (e) {
+      alert(`Не удалось скопировать: ${e}`);
     }
   };
 
@@ -146,7 +193,7 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
           </div>
 
           {/* Sidebar / Settings */}
-          <div className="w-full md:w-80 flex flex-col justify-between p-6 bg-[#101626] border-t md:border-t-0 md:border-l border-[#232b42] gap-4">
+          <div className="w-full md:w-84 flex flex-col justify-between p-6 bg-[#101626] border-t md:border-t-0 md:border-l border-[#232b42] gap-4 overflow-y-auto max-h-[80vh]">
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-xs font-medium text-[#8da2c0] uppercase tracking-wider mb-1">
@@ -184,13 +231,77 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
                 </div>
               </div>
 
+              {/* Share result card or notice */}
+              {shareUrl && (
+                <div className="p-3 bg-[#0a1426] border border-[#1e3e6d] rounded-lg flex flex-col gap-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[#38bdf8]">
+                    <span className="flex items-center gap-1.5">
+                      <span>✨</span> Временная ссылка готова
+                    </span>
+                    <span className="text-[10px] text-[#94a3b8] font-normal">
+                      3 дня
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      readOnly
+                      value={shareUrl}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                      className="flex-1 px-2.5 py-1.5 text-xs bg-[#050814] border border-[#233554] rounded text-white font-mono select-all focus:outline-none"
+                    />
+                    <button
+                      onClick={handleCopyShareLink}
+                      className="px-2.5 py-1.5 bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-medium rounded transition-colors whitespace-nowrap cursor-pointer"
+                      title="Скопировать ссылку"
+                    >
+                      {shareCopied ? 'Скопировано!' : 'Копия'}
+                    </button>
+                    <button
+                      onClick={() => window.open(shareUrl, '_blank')}
+                      className="px-2 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-white text-xs font-medium rounded transition-colors cursor-pointer"
+                      title="Открыть в новой вкладке"
+                    >
+                      ↗
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[#7d92b0] leading-snug">
+                    Ссылка содержит изолированный рендер, характеристики и позволяет открыть шаттл в редакторе карт.
+                  </p>
+                </div>
+              )}
+
+              {shareError && (
+                <div className="p-2.5 bg-red-950/60 border border-red-800/70 rounded-md text-xs text-red-200">
+                  ⚠️ {shareError}
+                </div>
+              )}
+
               <p className="text-[11px] text-[#8292ab] leading-relaxed">
-                Шаттл рендерится изолированно и не сохраняется в общую базу данных сайта.
+                Шаттл рендерится изолированно и не сохраняется в постоянную базу данных сайта.
               </p>
             </div>
 
             {/* Actions */}
             <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={handleShare}
+                disabled={isSharing}
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-[#0284c7] to-[#0ea5e9] hover:from-[#0369a1] hover:to-[#0284c7] text-white font-semibold text-xs rounded-lg shadow-md shadow-sky-950/40 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isSharing ? (
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    <span>Создание ссылки...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔗</span>
+                    <span>Поделиться ссылкой (3 дня)</span>
+                  </>
+                )}
+              </button>
+
               <button
                 onClick={handleDownloadPng}
                 className="w-full py-2.5 px-3 bg-[#00adb5] hover:bg-[#00c2cb] text-black font-semibold text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2"
