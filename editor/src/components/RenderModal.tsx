@@ -3,7 +3,10 @@ import type { ShuttleSnapshotResult } from '../rendering/shuttleSnapshotRenderer
 import type { EditorState } from '../state/editorState';
 import { exportMap } from '../export/mapExporter';
 import { createShuttleShareLink } from '../services/shareService';
-import { saveSnapshotToGallery } from '../services/galleryService';
+import {
+  saveSnapshotToGallery,
+  publishSnapshotToCommunity,
+} from '../services/galleryService';
 
 interface Props {
   snapshot: ShuttleSnapshotResult;
@@ -34,6 +37,16 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
   const [shareError, setShareError] = useState<string | null>(null);
   const [savedToGallery, setSavedToGallery] = useState(false);
   const [savedGalleryId, setSavedGalleryId] = useState<string | null>(null);
+  const [showCommunityForm, setShowCommunityForm] = useState(false);
+  const [authorName, setAuthorName] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('webmap_author_nickname') || 'Инженер Станции';
+    }
+    return 'Инженер Станции';
+  });
+  const [tagsInput, setTagsInput] = useState('кастом, шаттл');
+  const [publishedToCommunity, setPublishedToCommunity] = useState(false);
+  const [publishedCommunityId, setPublishedCommunityId] = useState<string | null>(null);
 
   const handleSaveToGallery = () => {
     try {
@@ -49,6 +62,33 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
       setTimeout(() => setSavedToGallery(false), 4000);
     } catch (e) {
       alert(`Не удалось сохранить в галерею: ${e}`);
+    }
+  };
+
+  const handlePublishToCommunity = () => {
+    try {
+      const tags = tagsInput
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const item = publishSnapshotToCommunity(
+        snapshot,
+        state,
+        shuttleName,
+        authorName,
+        tags,
+        shareUrl || undefined,
+        shareExpiresAt || undefined,
+      );
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('webmap_author_nickname', authorName);
+      }
+      setPublishedCommunityId(item.id);
+      setPublishedToCommunity(true);
+      setShowCommunityForm(false);
+      setTimeout(() => setPublishedToCommunity(false), 5000);
+    } catch (e) {
+      alert(`Не удалось опубликовать: ${e}`);
     }
   };
 
@@ -322,6 +362,62 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
                     className="underline text-emerald-300 hover:text-white"
                   >
                     Перейти в галерею ↗
+                  </a>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowCommunityForm(!showCommunityForm)}
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-[#9333ea] to-[#a855f7] hover:from-[#7e22ce] hover:to-[#9333ea] text-white font-semibold text-xs rounded-lg shadow-md shadow-purple-950/40 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>🌐</span>
+                <span>Опубликовать в общественную галерею</span>
+              </button>
+
+              {showCommunityForm && (
+                <div className="p-3 bg-[#15102a] border border-[#3b2268] rounded-lg flex flex-col gap-2.5 text-xs animate-in fade-in">
+                  <div className="font-semibold text-purple-300 flex items-center gap-1.5">
+                    <span>🚀</span> Публикация в сообщество
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase text-[#a78bfa] mb-1">Никнейм автора:</label>
+                    <input
+                      type="text"
+                      value={authorName}
+                      onChange={(e) => setAuthorName(e.target.value)}
+                      placeholder="Ваш никнейм или позывной"
+                      className="w-full px-2.5 py-1.5 text-xs bg-[#0b0817] border border-[#4c2889] rounded text-white focus:outline-none focus:border-[#a855f7]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase text-[#a78bfa] mb-1">Теги (через запятую):</label>
+                    <input
+                      type="text"
+                      value={tagsInput}
+                      onChange={(e) => setTagsInput(e.target.value)}
+                      placeholder="боевой, шахтерский, скоростной"
+                      className="w-full px-2.5 py-1.5 text-xs bg-[#0b0817] border border-[#4c2889] rounded text-white focus:outline-none focus:border-[#a855f7]"
+                    />
+                  </div>
+                  <button
+                    onClick={handlePublishToCommunity}
+                    className="w-full py-2 bg-[#9333ea] hover:bg-[#7e22ce] text-white font-semibold text-xs rounded transition-colors cursor-pointer"
+                  >
+                    Подтвердить и опубликовать
+                  </button>
+                </div>
+              )}
+
+              {publishedToCommunity && (
+                <div className="flex items-center justify-between px-2.5 py-1.5 bg-purple-950/50 border border-purple-800/60 rounded text-[11px] text-purple-200 animate-in fade-in">
+                  <span>✨ Опубликовано в сообщество!</span>
+                  <a
+                    href="../gallery"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline text-purple-300 hover:text-white"
+                  >
+                    Открыть галерею ↗
                   </a>
                 </div>
               )}

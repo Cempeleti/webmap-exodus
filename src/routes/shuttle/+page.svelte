@@ -5,14 +5,16 @@
 		formatPrice,
 		getShuttleById,
 		getUserGalleryItem,
+		getCommunityShuttleById,
 		shuttleConfig,
 		shuttleGroupColors,
 		type Shuttle,
+		type ShuttleGroup,
 		type ShuttleHullClass,
 		type ShuttleSize
 	} from '$lib';
 	import { page } from '$app/state';
-	import { asset, resolve } from '$app/paths';
+	import { asset, base, resolve } from '$app/paths';
 	import { browser } from '$app/environment';
 	import configJson from '$root/config.json' with { type: 'json' };
 
@@ -22,6 +24,7 @@
 	let customShuttle = $state<Shuttle | null>(null);
 
 	let id = $derived(browser ? (page.url.searchParams.get('id') ?? '') : '');
+	let communityIdParam = $derived(browser ? (page.url.searchParams.get('communityId') ?? '') : '');
 	let galleryIdParam = $derived(browser ? (page.url.searchParams.get('galleryId') ?? '') : '');
 	let shareParam = $derived(browser ? (page.url.searchParams.get('share') ?? '') : '');
 	let imgParam = $derived(browser ? (page.url.searchParams.get('img') ?? '') : '');
@@ -30,11 +33,42 @@
 		Boolean(shareParam || imgParam || (id === 'custom' && customShuttle?.isShared))
 	);
 	let isCustom = $derived(
-		id === 'custom' || Boolean(galleryIdParam) || Boolean(shareParam) || Boolean(imgParam)
+		id === 'custom' || Boolean(communityIdParam) || Boolean(galleryIdParam) || Boolean(shareParam) || Boolean(imgParam)
 	);
 
 	$effect(() => {
 		if (!browser) return;
+
+		// 0. Community shuttle item
+		if (communityIdParam) {
+			const comm = getCommunityShuttleById(communityIdParam);
+			if (comm) {
+				customShuttle = {
+					id: comm.id,
+					name: comm.name,
+					author: comm.author,
+					description: comm.description,
+					price: 0,
+					group: (comm.group as ShuttleGroup) || 'custom',
+					hullClass: (comm.hullClass as ShuttleHullClass) || 'shuttle',
+					size: comm.size,
+					classes: ['civilian'],
+					engines: ['plasma'],
+					image: comm.image,
+					tags: comm.tags,
+					tileWidth: comm.tileWidth,
+					tileHeight: comm.tileHeight,
+					entityCount: comm.entityCount,
+					mapPath: comm.mapPath,
+					yamlUrl: comm.yamlUrl || comm.shareUrl,
+					yamlContent: comm.yamlContent,
+					createdAt: comm.createdAt,
+					expiresAt: comm.shareExpiresAt,
+					isShared: false
+				};
+				return;
+			}
+		}
 
 		// 1. User gallery item
 		if (galleryIdParam) {
@@ -291,7 +325,10 @@
 			<div class="breadcrumb" aria-label="Навигационная цепочка">
 				<a href={resolve('/')} class="bc-link">Каталог</a>
 				<span aria-hidden="true">/</span>
-				{#if galleryIdParam}
+				{#if communityIdParam}
+					<a href={resolve('/gallery')} class="bc-link">Общественная галерея</a>
+					<span aria-hidden="true">/</span>
+				{:else if galleryIdParam}
 					<a href={resolve('/gallery')} class="bc-link">Моя галерея</a>
 					<span aria-hidden="true">/</span>
 				{:else if isShared}
@@ -311,6 +348,12 @@
 					<div class="title-row">
 						<h1 class="shuttle-name">{shuttle.name}</h1>
 						<div class="title-tags">
+							{#if shuttle.author}
+								<span class="author-badge">
+									<span class="author-icon" aria-hidden="true">👤</span>
+									{shuttle.author}
+								</span>
+							{/if}
 							{#if isShared}
 								<span class="shared-badge">
 									<svg
@@ -357,6 +400,14 @@
 
 					{#if shuttle.description}
 						<p class="shuttle-desc">{shuttle.description}</p>
+					{/if}
+
+					{#if shuttle.tags && shuttle.tags.length > 0}
+						<div class="shuttle-tags-row">
+							{#each shuttle.tags as tag}
+								<span class="shuttle-tag-badge">{tag}</span>
+							{/each}
+						</div>
 					{/if}
 				</div>
 
@@ -584,8 +635,35 @@
 						</a>
 					{:else if shuttle.mapPath}
 						<a
+							class="download-action-btn"
+							href={`${base}/${shuttle.mapPath.startsWith('static/') ? shuttle.mapPath.slice(7) : `editor/${shuttle.mapPath}`}`}
+							download={`${(shuttle.name || 'shuttle').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.yml`}
+							target="_blank"
+							rel="noopener noreferrer"
+							title="Скачать файл карты SS14 Grid"
+						>
+							<svg
+								width="15"
+								height="15"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+								<polyline points="14 2 14 8 20 8" />
+								<line x1="12" y1="18" x2="12" y2="12" />
+								<line x1="9" y1="15" x2="15" y2="15" />
+							</svg>
+							Скачать .yml
+						</a>
+						<a
 							class="edit-link"
-							href={resolve(`/editor?shuttle=${encodeURIComponent(shuttle.id)}`)}
+							href={resolve(
+								`/editor?shuttle=${encodeURIComponent(shuttle.mapPath ? shuttle.mapPath.replace('maps/by-id/', '').replace('.yml', '') : shuttle.id)}`
+							)}
 						>
 							Редактировать в редакторе
 						</a>
@@ -954,6 +1032,37 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
+	}
+
+	.author-badge {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 4px 10px;
+		border-radius: var(--radius-sm);
+		background: rgba(168, 85, 247, 0.15);
+		color: #c084fc;
+		border: 1px solid rgba(168, 85, 247, 0.4);
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+
+	.shuttle-tags-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 10px;
+	}
+
+	.shuttle-tag-badge {
+		font-size: 0.72rem;
+		font-family: var(--font-mono);
+		color: #38bdf8;
+		background: rgba(56, 189, 248, 0.1);
+		border: 1px solid rgba(56, 189, 248, 0.3);
+		border-radius: 9999px;
+		padding: 2px 10px;
 	}
 
 	.expiration-banner {

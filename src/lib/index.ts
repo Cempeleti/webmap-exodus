@@ -25,6 +25,8 @@ export interface Shuttle {
 	entityCount?: number;
 	yamlUrl?: string;
 	yamlContent?: string;
+	author?: string;
+	tags?: string[];
 	createdAt?: string;
 	expiresAt?: string;
 	isShared?: boolean;
@@ -207,4 +209,5 @@ export const shuttleGroupColors: Record<string, string> = {
 };
 
 export * from './userGallery';
+export * from './communityGallery';
 

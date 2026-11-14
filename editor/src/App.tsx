@@ -367,7 +367,13 @@ export const App: React.FC = () => {
     }
 
     // 3. Load from URL (remote or local vanilla map)
-    const targetUrl = loadUrl || (shuttleId ? `./maps/by-id/${encodeURIComponent(shuttleId)}.yml` : null);
+    const targetUrl =
+      loadUrl ||
+      (shuttleId
+        ? shuttleId.endsWith('.yml') || shuttleId.startsWith('./')
+          ? shuttleId
+          : `./maps/by-id/${encodeURIComponent(shuttleId)}.yml`
+        : null);
     if (!targetUrl) return;
 
     webmapLoadStartedRef.current = true;

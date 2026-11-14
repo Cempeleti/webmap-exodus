@@ -3,6 +3,7 @@ import {
   estimateSizeCategory,
   getUserGallery,
   saveSnapshotToGallery,
+  publishSnapshotToCommunity,
 } from '../galleryService';
 import type { ShuttleSnapshotResult } from '../../rendering/shuttleSnapshotRenderer';
 import type { EditorState } from '../../state/editorState';
@@ -93,5 +94,61 @@ describe('galleryService', () => {
     expect(gallery).toHaveLength(1);
     expect(gallery[0].id).toBe(saved.id);
     expect(gallery[0].name).toBe('Sparrow');
+  });
+
+  it('publishSnapshotToCommunity saves shuttle in community submissions with author and tags', () => {
+    const mockSnapshot: ShuttleSnapshotResult = {
+      blob: new Blob(['png-bytes'], { type: 'image/png' }),
+      dataUrl: 'data:image/png;base64,123',
+      width: 640,
+      height: 480,
+      tileWidth: 25,
+      tileHeight: 20,
+      entityCount: 150,
+    };
+
+    const emptyGrid = createEmptyGridData(1, 'Falcon');
+    const mockState: EditorState = {
+      grids: [emptyGrid],
+      activeGridIndex: 0,
+      grid: emptyGrid.grid,
+      entities: emptyGrid.entities,
+      containedEntities: emptyGrid.containedEntities,
+      gridUid: 1,
+      mapUid: 0,
+      maps: {},
+      gridUidList: [1],
+      structuralEntityData: new Map(),
+      entityRawComponents: new Map(),
+      entityRawPreamble: new Map(),
+      chunkKeyOrder: new Map(),
+      lineEnding: '\n',
+      hasDocumentTerminator: false,
+      entityOrder: [],
+      meta: { format: 7, name: 'Falcon' },
+      tilemap: {},
+      decalsDirty: false,
+    } as any;
+
+    const published = publishSnapshotToCommunity(
+      mockSnapshot,
+      mockState,
+      'Falcon Heavy',
+      'Инженер Новиков',
+      ['боевой', '#щиты'],
+      'https://trystocare.com/xyz',
+    );
+
+    expect(published.id).toMatch(/^comm_user_/);
+    expect(published.author).toBe('Инженер Новиков');
+    expect(published.tags).toEqual(['#боевой', '#щиты']);
+    expect(published.isUserSubmission).toBe(true);
+    expect(published.likes).toBe(1);
+
+    const storedRaw = storageMap.get('webmap_community_submissions');
+    expect(storedRaw).toBeDefined();
+    const parsed = JSON.parse(storedRaw!);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe(published.id);
   });
 });
