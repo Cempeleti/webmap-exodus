@@ -524,7 +524,29 @@
 	<!-- Gallery Content -->
 	{#if activeTab === 'community'}
 		<!-- Community Grid -->
-		{#if filteredCommunity.length === 0}
+		{#if communityList.length === 0}
+			<div class="empty-state">
+				<div class="empty-icon">🛰️</div>
+				<h2 class="empty-title">В общественной галерее пока нет опубликованных шаттлов</h2>
+				<p class="empty-desc">
+					Станьте первым, кто опубликует свой проект! Вы можете построить шаттл в редакторе карт или модифицировать любой корабль из каталога и нажать «Опубликовать в общественную галерею».
+				</p>
+				<div class="empty-actions">
+					<a href={resolve('/editor')} class="btn-primary-lg">
+						<span>🛠️</span>
+						Создать в редакторе
+					</a>
+					<button class="btn-secondary-lg" onclick={() => (showImportModal = true)}>
+						<span>📥</span>
+						Импортировать по ссылке
+					</button>
+					<a href={resolve('/')} class="btn-secondary-lg">
+						<span>📚</span>
+						Выбрать из каталога
+					</a>
+				</div>
+			</div>
+		{:else if filteredCommunity.length === 0}
 			<div class="no-results">
 				<p>По выбранным фильтрам ничего не найдено в общественной галерее.</p>
 				<button
