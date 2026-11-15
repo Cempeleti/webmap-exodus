@@ -225,6 +225,24 @@ describe('computePipeChanges', () => {
     expect(refitted!.prototype).toBe('GasPipeBend');
   });
 
+  it('preserves existing UID metadata for refitted tiles', () => {
+    const { fittedPipes } = computePipeChanges([{ x: 6, y: 5 }], [
+      { uid: 100, x: 5, y: 4 },
+      { uid: 101, x: 5, y: 5 },
+    ]);
+    expect(fittedPipes.find(p => p.x === 5 && p.y === 5)?.uid).toBe(101);
+  });
+
+  it('does not remove duplicate occupied tiles silently', () => {
+    const { removedUids, fittedPipes } = computePipeChanges([{ x: 6, y: 5 }], [
+      { uid: 100, x: 5, y: 5 },
+      { uid: 101, x: 5, y: 5 },
+    ]);
+    expect(removedUids).not.toContain(100);
+    expect(removedUids).not.toContain(101);
+    expect(fittedPipes.some(p => p.x === 5 && p.y === 5)).toBe(false);
+  });
+
   it('does not remove unaffected existing pipes', () => {
     const existing = [
       { uid: 100, x: 5, y: 3 },

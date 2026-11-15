@@ -184,6 +184,35 @@ describe('PipeDrawTool', () => {
     }
   });
 
+  it('uses a 4-connected route for diagonal drags', () => {
+    const tool = new PipeDrawTool();
+    tool.pipeType = 'supply';
+    const { ctx, dispatched } = makeToolContext();
+    tool.onMouseDown(ctx, 3, 3, 0);
+    tool.onMouseMove(ctx, 6, 6);
+    tool.onMouseUp(ctx);
+    const adds = dispatched[0].command.entityChanges.filter((ec: any) => ec.action === 'add');
+    const positions = adds.map((ec: any) => ({ x: Math.floor(ec.entity.position.x), y: Math.floor(ec.entity.position.y) }));
+    const set = new Set(positions.map((p: any) => `${p.x},${p.y}`));
+    for (const p of positions) {
+      if (p.x === 3 && p.y === 3) continue;
+      expect([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => set.has(`${p.x + dx},${p.y + dy}`))).toBe(true);
+    }
+  });
+
+  it('keeps gas layers isolated and normalizes color matching', () => {
+    const alt: ImportedEntity = { uid: 10, prototype: 'GasPipeStraightAlt1', position: { x: 5.5, y: 5.5 }, rotation: 0, components: [{ type: 'AtmosPipeColor', color: '#0055CC' }] };
+    const other: ImportedEntity = { uid: 11, prototype: 'GasPipeStraight', position: { x: 6.5, y: 5.5 }, rotation: 0, components: [{ type: 'AtmosPipeColor', color: '#FF0000FF' }] };
+    const tool = new PipeDrawTool();
+    tool.pipeType = 'supply';
+    const { ctx, dispatched } = makeToolContext([alt, other]);
+    tool.onMouseDown(ctx, 5, 5, 0);
+    tool.onMouseUp(ctx);
+    const changes = dispatched[0].command.entityChanges;
+    expect(changes.some((c: any) => c.action === 'remove' && c.entity.uid === 10)).toBe(false);
+    expect(changes.some((c: any) => c.action === 'remove' && c.entity.uid === 11)).toBe(false);
+  });
+
   it('refits existing neighbors when extending a pipe', () => {
     // Existing vertical pipe at (5,4) and (5,5)
     const existing: ImportedEntity[] = [

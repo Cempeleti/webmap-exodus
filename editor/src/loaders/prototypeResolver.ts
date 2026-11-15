@@ -63,6 +63,22 @@ function inferSmoothBase(
  * Determine the IconSmooth mode from the YAML field.
  * Default is 'Corners'. Supports 'Corners', 'CardinalFlags', and 'Diagonal'.
  */
+function parseSpriteOffset(value: unknown): { x: number; y: number } | undefined {
+  if (typeof value === 'string') {
+    const parts = value.split(',').map(Number);
+    if (parts.length === 2 && parts.every(Number.isFinite)) {
+      return { x: parts[0], y: parts[1] };
+    }
+  }
+  if (value && typeof value === 'object') {
+    const raw = value as { x?: unknown; y?: unknown };
+    if (typeof raw.x === 'number' && typeof raw.y === 'number' && Number.isFinite(raw.x) && Number.isFinite(raw.y)) {
+      return { x: raw.x, y: raw.y };
+    }
+  }
+  return undefined;
+}
+
 function inferSmoothMode(
   iconSmoothComp: RawComponent | undefined,
 ): 'Corners' | 'CardinalFlags' | 'Diagonal' | undefined {
@@ -188,6 +204,8 @@ export function extractSpriteInfo(components: RawComponent[]): SpriteInfo | null
     drawDepth: spriteComp.drawdepth as string | undefined,
     noRot: spriteComp.noRot === true || (spriteComp as Record<string, unknown>).norot === true
       ? true : undefined,
+    offset: parseSpriteOffset(spriteComp.offset),
+    scale: parseSpriteOffset(spriteComp.scale),
     color: spriteComp.color as string | undefined,
     iconSmoothKey: iconSmoothComp?.key as string | undefined,
     iconSmoothBase: inferSmoothBase(iconSmoothComp, baseState),

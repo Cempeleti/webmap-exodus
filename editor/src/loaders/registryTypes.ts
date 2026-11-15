@@ -43,6 +43,8 @@ export interface SpriteInfo {
   baseState: string;       // e.g., "base"
   drawDepth?: string;
   noRot?: boolean;         // true = don't apply canvas rotation (direction frame still selected by entity rotation)
+  offset?: { x: number; y: number }; // Sprite component local offset in tile units
+  scale?: { x: number; y: number };  // Sprite component local scale
   color?: string;          // component-level color (e.g., "#FFFFFF80" for semi-transparent puddles)
   iconSmoothKey?: string;  // IconSmooth key for neighbor matching (entities with same key connect)
   iconSmoothBase?: string; // IconSmooth state prefix (e.g., "state_" for tables, "swindow" for shuttle windows)

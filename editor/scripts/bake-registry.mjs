@@ -139,6 +139,17 @@ function normalizeRsiPath(rsiPath) {
     .replace(/\\/g, '/');
 }
 
+function parseSpriteOffset(value) {
+  if (typeof value === 'string') {
+    const parts = value.split(',').map(Number);
+    if (parts.length === 2 && parts.every(Number.isFinite)) return { x: parts[0], y: parts[1] };
+  }
+  if (value && typeof value === 'object' && Number.isFinite(value.x) && Number.isFinite(value.y)) {
+    return { x: Number(value.x), y: Number(value.y) };
+  }
+  return undefined;
+}
+
 function extractSpriteInfo(components) {
   const spriteComp = components.find(c => c.type === 'Sprite');
   if (!spriteComp) return null;
@@ -189,6 +200,8 @@ function extractSpriteInfo(components) {
     baseState,
     drawDepth: spriteComp.drawdepth ?? spriteComp.drawDepth,
     noRot: spriteComp.noRot,
+    offset: parseSpriteOffset(spriteComp.offset),
+    scale: parseSpriteOffset(spriteComp.scale),
     color: spriteComp.color,
     iconSmoothKey: iconSmoothComp?.key,
     iconSmoothBase: inferSmoothBase(iconSmoothComp, baseState),

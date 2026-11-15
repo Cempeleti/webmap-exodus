@@ -451,6 +451,35 @@ export function clearEntitySpriteCache(): void {
   loadingSet.clear();
 }
 
+function parseSpriteVector(value: unknown): { x: number; y: number } | undefined {
+  if (typeof value === 'string') {
+    const parts = value.split(',').map(Number);
+    if (parts.length === 2 && parts.every(Number.isFinite)) return { x: parts[0], y: parts[1] };
+  }
+  if (value && typeof value === 'object') {
+    const raw = value as { x?: unknown; y?: unknown };
+    if (typeof raw.x === 'number' && typeof raw.y === 'number' && Number.isFinite(raw.x) && Number.isFinite(raw.y)) {
+      return { x: raw.x, y: raw.y };
+    }
+  }
+  return undefined;
+}
+
+/** Resolve Sprite component transform, including bundles baked before offset metadata was added. */
+export function getSpriteTransform(
+  prototype: string,
+  registry: IPrototypeRegistry,
+): { offset?: { x: number; y: number }; scale?: { x: number; y: number } } {
+  const info = typeof registry?.getSpriteInfo === 'function' ? registry.getSpriteInfo(prototype) : undefined;
+  const sprite = typeof registry?.getEntity === 'function'
+    ? (registry.getEntity(prototype)?.components.find(c => c.type === 'Sprite') as Record<string, unknown> | undefined)
+    : undefined;
+  return {
+    offset: info?.offset ?? parseSpriteVector(sprite?.offset),
+    scale: info?.scale ?? parseSpriteVector(sprite?.scale),
+  };
+}
+
 // ---- Direction helpers ----
 
 /**
@@ -911,9 +940,16 @@ export function renderEntities(
     // Dim subfloor entities when T-Ray is off
     if (dimmed) { ctx.globalAlpha = SUBFLOOR_DIM_OPACITY; }
 
-    // Entity position is the center; subtract 0.5 to get top-left draw origin
-    const screenX = camera.worldToScreenX(position.x - 0.5, canvasW);
-    const screenY = camera.worldToScreenY(position.y - 0.5, canvasH);
+    // Entity position is the center; subtract 0.5 to get top-left draw origin.
+    // SS14 Sprite.Offset is local world-space displacement: +X moves right and
+    // +Y moves up (screen Y therefore moves up). It is part of the sprite
+    // transform, not a change to the entity's logical position.
+    const spriteTransform = getSpriteTransform(prototype, registry);
+    const spriteOffset = spriteTransform.offset;
+    const offsetX = (spriteOffset?.x ?? 0) * tileScreenSize;
+    const offsetY = -(spriteOffset?.y ?? 0) * tileScreenSize;
+    const screenX = camera.worldToScreenX(position.x - 0.5, canvasW) + offsetX;
+    const screenY = camera.worldToScreenY(position.y - 0.5, canvasH) + offsetY;
     const tileX = Math.floor(position.x);
     const tileY = Math.floor(position.y);
 
@@ -1038,24 +1074,33 @@ export function renderEntities(
     // Sprites larger than one tile (64x64 vehicles etc.) draw at their native
     // RSI size centered on the tile, matching in-game rendering, instead of
     // being squeezed into a single tile.
+    const spriteScale = spriteTransform.scale;
+    const scaledWidth = sprite.sw * Math.abs(spriteScale?.x ?? 1);
+    const scaledHeight = sprite.sh * Math.abs(spriteScale?.y ?? 1);
     const spriteRect = getCenteredSpriteRect(
-      screenX, screenY, tileScreenSize, sprite.sw, sprite.sh,
+      screenX, screenY, tileScreenSize, scaledWidth, scaledHeight,
     );
 
     const tinted = tintColor ? getTintedSprite(sprite, tintColor) : null;
 
+    const drawScaleX = spriteScale?.x ?? 1;
+    const drawScaleY = spriteScale?.y ?? 1;
+    ctx.save();
+    ctx.translate(spriteRect.x + spriteRect.width / 2, spriteRect.y + spriteRect.height / 2);
+    ctx.scale(Math.sign(drawScaleX) || 1, Math.sign(drawScaleY) || 1);
     if (tinted) {
       ctx.drawImage(
         tinted,
-        spriteRect.x, spriteRect.y, spriteRect.width, spriteRect.height,
+        -spriteRect.width / 2, -spriteRect.height / 2, spriteRect.width, spriteRect.height,
       );
     } else {
       ctx.drawImage(
         sprite.image,
         sprite.sx, sprite.sy, sprite.sw, sprite.sh,
-        spriteRect.x, spriteRect.y, spriteRect.width, spriteRect.height,
+        -spriteRect.width / 2, -spriteRect.height / 2, spriteRect.width, spriteRect.height,
       );
     }
+    ctx.restore();
 
     if (hasAlpha) {
       ctx.restore();

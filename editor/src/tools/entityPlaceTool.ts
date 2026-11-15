@@ -2,7 +2,7 @@ import type { ITool, ToolContext } from './toolTypes';
 import type { ImportedEntity } from '../import/mapImporter';
 import type { CardinalDirection } from '../types';
 import { buildTransformComponent, normalizeRotation } from './entityHelpers';
-import { getCenteredSpriteRect, getEntitySprite } from '../rendering/entityRenderer';
+import { getCenteredSpriteRect, getEntitySprite, getSpriteTransform } from '../rendering/entityRenderer';
 
 function rotToDir(rotation: number): CardinalDirection {
   const TWO_PI = 2 * Math.PI;
@@ -78,6 +78,12 @@ export class EntityPlaceTool implements ITool {
 
     const protoId = state.selectedPaletteItem.id;
     const direction = rotToDir(this.currentRotation);
+    const spriteTransform = state.registry ? getSpriteTransform(protoId, state.registry) : {};
+    const spriteOffset = spriteTransform.offset;
+    const offsetX = (spriteOffset?.x ?? 0) * tileScreenSize;
+    const offsetY = -(spriteOffset?.y ?? 0) * tileScreenSize;
+    const spriteDrawX = drawX + offsetX;
+    const spriteDrawY = drawY + offsetY;
 
     // Try to draw entity sprite as ghost preview
     let drewSprite = false;
@@ -86,14 +92,14 @@ export class EntityPlaceTool implements ITool {
       const sprite = getEntitySprite(protoId, direction, state.registry);
       if (sprite) {
         const spriteRect = getCenteredSpriteRect(
-          drawX, drawY, tileScreenSize, sprite.sw, sprite.sh,
+          spriteDrawX, spriteDrawY, tileScreenSize, sprite.sw, sprite.sh,
         );
         const needsRotation = this.currentRotation !== 0 && sprite.sh === sprite.image.height;
         canvasCtx.save();
         canvasCtx.globalAlpha = 0.5;
         if (needsRotation) {
-          const cx = drawX + tileScreenSize / 2;
-          const cy = drawY + tileScreenSize / 2;
+          const cx = spriteDrawX + tileScreenSize / 2;
+          const cy = spriteDrawY + tileScreenSize / 2;
           canvasCtx.translate(cx, cy);
           canvasCtx.rotate(-this.currentRotation);
           canvasCtx.translate(-cx, -cy);

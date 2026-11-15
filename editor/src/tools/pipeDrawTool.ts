@@ -3,14 +3,21 @@ import type { ImportedEntity } from '../import/mapImporter';
 import type { PipeType } from '../types';
 import { PIPE_COLORS, PIPE_DISPLAY } from '../types';
 import { computePipeChanges, fitPipes, type PipeFamily } from '../algorithms/pipeFittings';
-import { buildTransformComponent } from './entityHelpers';
+import { buildTransformComponent, cloneComponentsWithPosRot } from './entityHelpers';
 
 /** Pipe prototypes that belong to gas pipe network */
+// Alt1/Alt2 are separate visual layers, not part of the editable base network.
 const GAS_PIPE_PROTOTYPES = new Set([
   'GasPipeStraight', 'GasPipeBend', 'GasPipeTJunction', 'GasPipeFourway', 'GasPipeHalf',
-  'GasPipeStraightAlt1', 'GasPipeBendAlt1', 'GasPipeTJunctionAlt1', 'GasPipeFourwayAlt1',
-  'GasPipeStraightAlt2', 'GasPipeBendAlt2', 'GasPipeTJunctionAlt2', 'GasPipeFourwayAlt2',
 ]);
+
+function normalizePipeColor(color: string | null | undefined): string | null {
+  if (!color) return null;
+  const normalized = color.trim().toUpperCase();
+  return /^#[0-9A-F]{6}([0-9A-F]{2})?$/.test(normalized)
+    ? (normalized.length === 7 ? `${normalized}FF` : normalized)
+    : normalized;
+}
 
 /** Pipe prototypes that belong to disposal network */
 const DISPOSAL_PIPE_PROTOTYPES = new Set([
@@ -106,17 +113,27 @@ export class PipeDrawTool implements ITool {
     const gridUid = ctx.state.gridUid;
     for (const pipe of fittedPipes) {
       const pos = { x: pipe.x + 0.5, y: pipe.y + 0.5 };
-      const components: Record<string, unknown>[] = buildTransformComponent(pos, pipe.rotation, gridUid);
-      if (pipe.color) {
-        components.push({ type: 'AtmosPipeColor', color: pipe.color });
+      const existing = pipe.uid === undefined
+        ? undefined
+        : ctx.state.entities.find(e => e.uid === pipe.uid);
+      const entity: ImportedEntity = existing
+        ? {
+            ...existing,
+            prototype: pipe.prototype,
+            position: { ...existing.position },
+            rotation: pipe.rotation,
+            components: cloneComponentsWithPosRot(existing.components, existing.position, pipe.rotation),
+          }
+        : {
+            uid: nextUid++,
+            prototype: pipe.prototype,
+            position: pos,
+            rotation: pipe.rotation,
+            components: buildTransformComponent(pos, pipe.rotation, gridUid),
+          };
+      if (!existing && pipe.color) {
+        entity.components.push({ type: 'AtmosPipeColor', color: pipe.color });
       }
-      const entity: ImportedEntity = {
-        uid: nextUid++,
-        prototype: pipe.prototype,
-        position: pos,
-        rotation: pipe.rotation,
-        components,
-      };
       entityChanges.push({ action: 'add', entity });
     }
 
@@ -207,11 +224,29 @@ export class PipeDrawTool implements ITool {
 
     while (x0 !== toX || y0 !== toY) {
       const e2 = 2 * err;
-      if (e2 > -dy) { err -= dy; x0 += sx; }
-      if (e2 < dx) { err += dx; y0 += sy; }
-      // Don't add the final tile, addTile will add it
-      if (x0 === toX && y0 === toY) break;
-      this.addSingleTile(x0, y0);
+      const stepX = e2 > -dy;
+      const stepY = e2 < dx;
+      // A diagonal Bresenham step would only touch corners. Split it into two
+      // cardinal tiles so every consecutive tile shares an edge.
+      if (stepX && stepY) {
+        const nextX = x0 + sx;
+        const nextY = y0 + sy;
+        if (Math.abs(toX - x0) >= Math.abs(toY - y0)) {
+          this.addSingleTile(nextX, y0);
+          this.addSingleTile(nextX, nextY);
+        } else {
+          this.addSingleTile(x0, nextY);
+          this.addSingleTile(nextX, nextY);
+        }
+        x0 = nextX;
+        y0 = nextY;
+        err += dx - dy;
+      } else {
+        if (stepX) { err -= dy; x0 += sx; }
+        if (stepY) { err += dx; y0 += sy; }
+        if (x0 === toX && y0 === toY) break;
+        this.addSingleTile(x0, y0);
+      }
     }
   }
 
@@ -226,8 +261,8 @@ export class PipeDrawTool implements ITool {
       if (this.family === 'disposal') return true;
 
       // For gas pipes, match by color
-      const entityColor = this.getEntityPipeColor(e);
-      return entityColor === (this.color ?? null);
+      const entityColor = normalizePipeColor(this.getEntityPipeColor(e));
+      return entityColor === normalizePipeColor(this.color);
     });
   }
 
@@ -243,10 +278,12 @@ export class PipeDrawTool implements ITool {
 
   private erasePipeAt(ctx: ToolContext, tileX: number, tileY: number) {
     const protos = this.prototypeSet;
+    const selectedColor = normalizePipeColor(this.color);
     const toRemove = ctx.state.entities.filter(e =>
       protos.has(e.prototype) &&
       Math.floor(e.position.x) === tileX &&
-      Math.floor(e.position.y) === tileY,
+      Math.floor(e.position.y) === tileY &&
+      (this.family === 'disposal' || normalizePipeColor(this.getEntityPipeColor(e)) === selectedColor),
     );
     if (toRemove.length === 0) return;
 
@@ -280,7 +317,6 @@ export class PipeDrawTool implements ITool {
       const allFitted = fitPipes(allRemainingTiles, this.family, this.color);
 
       // Only refit tiles that are neighbors of removed tiles
-      let nextUid = ctx.state.nextEntityId;
       for (const pipe of allFitted) {
         const key = `${pipe.x},${pipe.y}`;
         if (!neighbors.has(key)) continue;
@@ -294,19 +330,15 @@ export class PipeDrawTool implements ITool {
         }
 
         // Add new fitted entity
-        const refitPos = { x: pipe.x + 0.5, y: pipe.y + 0.5 };
-        const refitComps: Record<string, unknown>[] = buildTransformComponent(refitPos, pipe.rotation, ctx.state.gridUid);
-        if (pipe.color) {
-          refitComps.push({ type: 'AtmosPipeColor', color: pipe.color });
-        }
+        if (!oldEntity) continue;
         entityChanges.push({
           action: 'add',
           entity: {
-            uid: nextUid++,
+            ...oldEntity,
             prototype: pipe.prototype,
-            position: refitPos,
+            position: { ...oldEntity.position },
             rotation: pipe.rotation,
-            components: refitComps,
+            components: cloneComponentsWithPosRot(oldEntity.components, oldEntity.position, pipe.rotation),
           },
         });
       }

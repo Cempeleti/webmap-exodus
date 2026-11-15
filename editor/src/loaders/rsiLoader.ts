@@ -258,11 +258,9 @@ export async function loadSprite(
 
   const dirOffset = getDirectionOffset(direction, state.directions);
 
-  // RSI PNGs lay out cells (direction × frame) left-to-right, top-to-bottom,
-  // wrapping at the image width. For example, a 4-direction 32×32 state produces
-  // a 64×64 PNG (2×2 grid), not a 32×128 column.
-  const cellIndex = dirOffset * state.frameCount + frame;
+  // Each state has its own PNG; cells are packed left-to-right, top-to-bottom.
   const columnsPerRow = Math.max(1, Math.floor(image.width / meta.size.x));
+  const cellIndex = dirOffset * state.frameCount + frame;
   const sx = (cellIndex % columnsPerRow) * meta.size.x;
   const sy = Math.floor(cellIndex / columnsPerRow) * meta.size.y;
 

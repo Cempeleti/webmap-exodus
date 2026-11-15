@@ -14,6 +14,8 @@ export interface FittedPipe {
   prototype: string;
   rotation: number; // radians
   color?: string;
+  /** Existing entity UID when this tile is being refitted. */
+  uid?: number;
 }
 
 export type PipeFamily = 'gas' | 'disposal';
@@ -167,11 +169,17 @@ export function computePipeChanges(
   // Build combined tile set
   const allTiles = new Set<string>();
   const existingByKey = new Map<string, number>(); // key -> uid
+  const duplicateKeys = new Set<string>();
 
   for (const e of existingPipeEntities) {
     const key = `${Math.floor(e.x)},${Math.floor(e.y)}`;
     allTiles.add(key);
-    existingByKey.set(key, e.uid);
+    if (existingByKey.has(key)) {
+      // A duplicate is ambiguous: never replace one entity and silently lose the other.
+      duplicateKeys.add(key);
+    } else {
+      existingByKey.set(key, e.uid);
+    }
   }
 
   for (const t of newTiles) {
@@ -196,16 +204,19 @@ export function computePipeChanges(
   const fitted = fitPipes(allTiles, family, color);
 
   // Filter to only affected tiles
-  const affectedFitted = fitted.filter(p => affectedKeys.has(`${p.x},${p.y}`));
+  const affectedFitted = fitted
+    .filter(p => affectedKeys.has(`${p.x},${p.y}`))
+    .map(p => ({ ...p, uid: existingByKey.get(`${p.x},${p.y}`) }));
 
-  // Collect UIDs of existing entities that are being replaced
+  // Duplicate occupancy is ambiguous. Leave those tiles untouched rather than
+  // removing one UID and silently dropping the other entity/components.
+  const safeAffectedKeys = new Set([...affectedKeys].filter(key => !duplicateKeys.has(key)));
+  const safeFitted = affectedFitted.filter(p => safeAffectedKeys.has(`${p.x},${p.y}`));
   const removedUids: number[] = [];
-  for (const key of affectedKeys) {
+  for (const key of safeAffectedKeys) {
     const uid = existingByKey.get(key);
-    if (uid !== undefined) {
-      removedUids.push(uid);
-    }
+    if (uid !== undefined) removedUids.push(uid);
   }
 
-  return { removedUids, fittedPipes: affectedFitted };
+  return { removedUids, fittedPipes: safeFitted };
 }
