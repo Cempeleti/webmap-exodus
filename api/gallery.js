@@ -158,7 +158,7 @@ function getKvConfig() {
 
 function detectStorageBackend() {
 	const hasBlob = Boolean(
-		process.env.BLOB_READ_WRITE_TOKEN || (process.env.VERCEL_OIDC_TOKEN && process.env.BLOB_STORE_ID)
+		process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID
 	);
 	const kv = getKvConfig();
 	const githubToken = process.env.GITHUB_TOKEN;
@@ -176,18 +176,32 @@ function detectStorageBackend() {
 let blobAccessMode = process.env.BLOB_ACCESS === 'private' ? 'private' : 'public';
 
 /**
+ * @param {ApiRequest} req
+ * @returns {{ oidcToken?: string; storeId?: string }}
+ */
+function getBlobAuthOpts(req) {
+	const headerToken = req.headers?.['x-vercel-oidc-token'];
+	const oidcToken = Array.isArray(headerToken) ? headerToken[0] : headerToken;
+	if (oidcToken && process.env.BLOB_STORE_ID) {
+		return { oidcToken: String(oidcToken), storeId: process.env.BLOB_STORE_ID };
+	}
+	return {};
+}
+
+/**
  * @param {string} pathname
  * @param {string | Buffer} body
  * @param {{ addRandomSuffix?: boolean; allowOverwrite?: boolean; contentType?: string }} opts
+ * @param {{ oidcToken?: string; storeId?: string }} authOpts
  */
-async function blobPutSmart(pathname, body, opts) {
+async function blobPutSmart(pathname, body, opts, authOpts = {}) {
 	try {
-		return await put(pathname, body, { ...opts, access: blobAccessMode });
+		return await put(pathname, body, { ...opts, ...authOpts, access: blobAccessMode });
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		if (blobAccessMode === 'public' && msg.toLowerCase().includes('private')) {
 			blobAccessMode = 'private';
-			return await put(pathname, body, { ...opts, access: 'private' });
+			return await put(pathname, body, { ...opts, ...authOpts, access: 'private' });
 		}
 		throw err;
 	}
@@ -195,10 +209,11 @@ async function blobPutSmart(pathname, body, opts) {
 
 /**
  * @param {string} pathname
- * @param {string} [fallbackUrl]
+ * @param {string | undefined} fallbackUrl
+ * @param {{ oidcToken?: string; storeId?: string }} authOpts
  * @returns {Promise<{ buffer: Buffer; contentType: string } | null>}
  */
-async function blobReadSmart(pathname, fallbackUrl) {
+async function blobReadSmart(pathname, fallbackUrl, authOpts = {}) {
 	if (blobAccessMode === 'public' && fallbackUrl) {
 		try {
 			const r = await fetch(fallbackUrl);
@@ -212,10 +227,10 @@ async function blobReadSmart(pathname, fallbackUrl) {
 		} catch {}
 	}
 
-	const tryOrder = blobAccessMode === 'private' ? /** @type {const} */ (['private', 'public']) : /** @type {const} */ (['private', 'public']);
+	const tryOrder = /** @type {const} */ (['private', 'public']);
 	for (const access of tryOrder) {
 		try {
-			const result = await get(pathname, { access, useCache: false });
+			const result = await get(pathname, { ...authOpts, access, useCache: false });
 			if (result && result.statusCode === 200 && result.stream) {
 				if (access === 'private') blobAccessMode = 'private';
 				const buf = Buffer.from(await new Response(result.stream).arrayBuffer());
@@ -229,25 +244,29 @@ async function blobReadSmart(pathname, fallbackUrl) {
 	return null;
 }
 
-/** @param {string} prefix */
-async function blobListAll(prefix) {
+/**
+ * @param {string} prefix
+ * @param {{ oidcToken?: string; storeId?: string }} authOpts
+ */
+async function blobListAll(prefix, authOpts = {}) {
 	/** @type {Awaited<ReturnType<typeof list>>['blobs']} */
 	const all = [];
 	/** @type {string | undefined} */
 	let cursor;
 	do {
 		/** @type {Awaited<ReturnType<typeof list>>} */
-		const page = await list({ prefix, limit: 1000, cursor });
+		const page = await list({ prefix, limit: 1000, cursor, ...authOpts });
 		all.push(...page.blobs);
 		cursor = page.hasMore ? page.cursor : undefined;
 	} while (cursor);
 	return all;
 }
 
-async function blobGetAll() {
+/** @param {{ oidcToken?: string; storeId?: string }} authOpts */
+async function blobGetAll(authOpts = {}) {
 	const [metaBlobs, voteBlobs] = await Promise.all([
-		blobListAll(BLOB_META_PREFIX),
-		blobListAll(BLOB_LIKES_PREFIX)
+		blobListAll(BLOB_META_PREFIX, authOpts),
+		blobListAll(BLOB_LIKES_PREFIX, authOpts)
 	]);
 
 	/** @type {Map<string, number>} */
@@ -263,7 +282,7 @@ async function blobGetAll() {
 	const items = await Promise.all(
 		metaBlobs.map(async (mb) => {
 			try {
-				const loaded = await blobReadSmart(mb.pathname, mb.url);
+				const loaded = await blobReadSmart(mb.pathname, mb.url, authOpts);
 				if (!loaded) return null;
 				const meta = JSON.parse(loaded.buffer.toString('utf8'));
 				const voteCount = votesByShuttle.get(meta.id);
@@ -282,17 +301,20 @@ async function blobGetAll() {
 		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-/** @param {string} id */
-async function blobGetOne(id) {
-	const blobs = await blobListAll(`${BLOB_META_PREFIX}${id}.json`);
+/**
+ * @param {string} id
+ * @param {{ oidcToken?: string; storeId?: string }} authOpts
+ */
+async function blobGetOne(id, authOpts = {}) {
+	const blobs = await blobListAll(`${BLOB_META_PREFIX}${id}.json`, authOpts);
 	if (blobs.length === 0) return null;
-	const loaded = await blobReadSmart(blobs[0].pathname, blobs[0].url);
+	const loaded = await blobReadSmart(blobs[0].pathname, blobs[0].url, authOpts);
 	if (!loaded) return null;
 	const meta = JSON.parse(loaded.buffer.toString('utf8'));
-	const voteBlobs = await blobListAll(`${BLOB_LIKES_PREFIX}${id}/`);
+	const voteBlobs = await blobListAll(`${BLOB_LIKES_PREFIX}${id}/`, authOpts);
 	let yamlContent = meta.yamlContent;
 	if (!yamlContent) {
-		const yamlLoaded = await blobReadSmart(`community-shuttles/maps/${id}.yml`);
+		const yamlLoaded = await blobReadSmart(`community-shuttles/maps/${id}.yml`, undefined, authOpts);
 		if (yamlLoaded) {
 			yamlContent = yamlLoaded.buffer.toString('utf8');
 		}
@@ -304,8 +326,11 @@ async function blobGetOne(id) {
 	};
 }
 
-/** @param {ReturnType<typeof validateAndNormalizeSubmission>} draft */
-async function blobCreate(draft) {
+/**
+ * @param {ReturnType<typeof validateAndNormalizeSubmission>} draft
+ * @param {{ oidcToken?: string; storeId?: string }} authOpts
+ */
+async function blobCreate(draft, authOpts = {}) {
 	let imageUrl = draft.image;
 	const decoded = decodeImageDataUrl(draft.image);
 	if (decoded) {
@@ -313,7 +338,7 @@ async function blobCreate(draft) {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: decoded.contentType
-		});
+		}, authOpts);
 		imageUrl =
 			blobAccessMode === 'private'
 				? `/api/gallery?blob=${encodeURIComponent(imgBlob.pathname)}`
@@ -326,7 +351,7 @@ async function blobCreate(draft) {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'text/yaml; charset=utf-8'
-		});
+		}, authOpts);
 		yamlUrl =
 			blobAccessMode === 'private'
 				? `/api/gallery?blob=${encodeURIComponent(yamlBlob.pathname)}`
@@ -357,12 +382,12 @@ async function blobCreate(draft) {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'application/json; charset=utf-8'
-		}),
+		}, authOpts),
 		blobPutSmart(`${BLOB_LIKES_PREFIX}${draft.id}/author.txt`, '1', {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'text/plain'
-		})
+		}, authOpts)
 	]);
 
 	return sanitizeShuttlePublic(meta);
@@ -372,8 +397,9 @@ async function blobCreate(draft) {
  * @param {string} id
  * @param {string} voterId
  * @param {boolean} liked
+ * @param {{ oidcToken?: string; storeId?: string }} authOpts
  */
-async function blobToggleLike(id, voterId, liked) {
+async function blobToggleLike(id, voterId, liked, authOpts = {}) {
 	const safeVoter = String(voterId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'anon';
 	const votePath = `${BLOB_LIKES_PREFIX}${id}/${safeVoter}.txt`;
 	if (liked) {
@@ -381,27 +407,28 @@ async function blobToggleLike(id, voterId, liked) {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'text/plain'
-		});
+		}, authOpts);
 	} else {
-		const existing = await blobListAll(votePath);
+		const existing = await blobListAll(votePath, authOpts);
 		if (existing.length > 0) {
-			await del(existing.map((b) => b.url));
+			await del(existing.map((b) => b.url), authOpts);
 		}
 	}
-	const voteBlobs = await blobListAll(`${BLOB_LIKES_PREFIX}${id}/`);
+	const voteBlobs = await blobListAll(`${BLOB_LIKES_PREFIX}${id}/`, authOpts);
 	return voteBlobs.length;
 }
 
 /**
  * @param {string} id
  * @param {string} token
+ * @param {{ oidcToken?: string; storeId?: string }} authOpts
  */
-async function blobDelete(id, token) {
-	const blobs = await blobListAll(`${BLOB_META_PREFIX}${id}.json`);
+async function blobDelete(id, token, authOpts = {}) {
+	const blobs = await blobListAll(`${BLOB_META_PREFIX}${id}.json`, authOpts);
 	if (blobs.length === 0) {
 		throw httpError('Шаттл не найден.', 404);
 	}
-	const loaded = await blobReadSmart(blobs[0].pathname, blobs[0].url);
+	const loaded = await blobReadSmart(blobs[0].pathname, blobs[0].url, authOpts);
 	if (!loaded) {
 		throw httpError('Шаттл не найден.', 404);
 	}
@@ -411,9 +438,9 @@ async function blobDelete(id, token) {
 	}
 
 	const [imgBlobs, mapBlobs, voteBlobs] = await Promise.all([
-		blobListAll(`community-shuttles/images/${id}.`),
-		blobListAll(`community-shuttles/maps/${id}.`),
-		blobListAll(`${BLOB_LIKES_PREFIX}${id}/`)
+		blobListAll(`community-shuttles/images/${id}.`, authOpts),
+		blobListAll(`community-shuttles/maps/${id}.`, authOpts),
+		blobListAll(`${BLOB_LIKES_PREFIX}${id}/`, authOpts)
 	]);
 	const toDelete = [
 		blobs[0].url,
@@ -422,7 +449,7 @@ async function blobDelete(id, token) {
 		...voteBlobs.map((b) => b.url)
 	];
 
-	await del(toDelete);
+	await del(toDelete, authOpts);
 }
 
 // ---------------- Upstash Redis / Vercel KV Backend ----------------
@@ -889,6 +916,7 @@ export default async function handler(req, res) {
 
 	const query = parseQuery(req);
 	const backend = detectStorageBackend();
+	const blobAuthOpts = getBlobAuthOpts(req);
 
 	// Serve private Vercel Blob image/map assets when store uses private access
 	const blobParam = query.get('blob');
@@ -897,7 +925,7 @@ export default async function handler(req, res) {
 			return sendJson(res, 403, { error: 'Forbidden' });
 		}
 		try {
-			const loaded = await blobReadSmart(blobParam);
+			const loaded = await blobReadSmart(blobParam, undefined, blobAuthOpts);
 			if (!loaded) return sendJson(res, 404, { error: 'Not found' });
 			res.statusCode = 200;
 			res.setHeader('Access-Control-Allow-Origin', '*');
@@ -952,7 +980,7 @@ export default async function handler(req, res) {
 		if (req.method === 'GET') {
 			if (idParam) {
 				let item = null;
-				if (backend === 'blob') item = await blobGetOne(idParam);
+				if (backend === 'blob') item = await blobGetOne(idParam, blobAuthOpts);
 				else if (backend === 'kv') item = await kvGetOne(/** @type {KvConfig} */ (getKvConfig()), idParam);
 				else if (backend === 'github') item = await ghGetOne(getGithubConfig(), idParam);
 				else item = await localGetOne(idParam);
@@ -969,7 +997,7 @@ export default async function handler(req, res) {
 			}
 
 			let shuttles = [];
-			if (backend === 'blob') shuttles = await blobGetAll();
+			if (backend === 'blob') shuttles = await blobGetAll(blobAuthOpts);
 			else if (backend === 'kv') shuttles = await kvGetAll(/** @type {KvConfig} */ (getKvConfig()));
 			else if (backend === 'github') shuttles = await ghGetAll(getGithubConfig());
 			else shuttles = await localGetAll();
@@ -985,7 +1013,7 @@ export default async function handler(req, res) {
 			const voterId = String(body.voterId || 'anon');
 
 			let likes = 0;
-			if (backend === 'blob') likes = await blobToggleLike(targetId, voterId, liked);
+			if (backend === 'blob') likes = await blobToggleLike(targetId, voterId, liked, blobAuthOpts);
 			else if (backend === 'kv') likes = await kvToggleLike(/** @type {KvConfig} */ (getKvConfig()), targetId, voterId, liked);
 			else if (backend === 'github') likes = await ghToggleLike(getGithubConfig(), targetId, voterId, liked);
 			else likes = await localToggleLike(targetId, voterId, liked);
@@ -998,7 +1026,7 @@ export default async function handler(req, res) {
 			const draft = validateAndNormalizeSubmission(body);
 
 			let created;
-			if (backend === 'blob') created = await blobCreate(draft);
+			if (backend === 'blob') created = await blobCreate(draft, blobAuthOpts);
 			else if (backend === 'kv') created = await kvCreate(/** @type {KvConfig} */ (getKvConfig()), draft);
 			else if (backend === 'github') created = await ghCreate(getGithubConfig(), draft);
 			else created = await localCreate(draft);
@@ -1017,7 +1045,7 @@ export default async function handler(req, res) {
 			const rawToken = req.headers['x-delete-token'] || query.get('token') || '';
 			const token = Array.isArray(rawToken) ? rawToken[0] : String(rawToken);
 
-			if (backend === 'blob') await blobDelete(targetId, token);
+			if (backend === 'blob') await blobDelete(targetId, token, blobAuthOpts);
 			else if (backend === 'kv') await kvDelete(/** @type {KvConfig} */ (getKvConfig()), targetId, token);
 			else if (backend === 'github') await ghDelete(getGithubConfig(), targetId, token);
 			else await localDelete(targetId, token);
@@ -1028,10 +1056,22 @@ export default async function handler(req, res) {
 		return sendJson(res, 405, { error: 'Method not allowed' });
 	} catch (err) {
 		const typedErr = /** @type {{ statusCode?: number; message?: string }} */ (err);
+		const msg = typedErr?.message || 'Внутренняя ошибка сервера галереи';
+		if (msg.includes('No blob credentials found')) {
+			if (req.method === 'GET') {
+				return sendJson(res, 200, {
+					configured: false,
+					storageMode: 'unconfigured',
+					shuttles: []
+				});
+			}
+			return sendJson(res, 503, {
+				code: 'STORAGE_NOT_CONFIGURED',
+				error: 'Найден BLOB_STORE_ID, но не найден токен доступа. Включите Vercel OIDC или добавьте BLOB_READ_WRITE_TOKEN в Environment Variables проекта на Vercel и сделайте Redeploy.'
+			});
+		}
 		const status = typedErr?.statusCode || 500;
 		console.error('Gallery API error:', err);
-		return sendJson(res, status, {
-			error: typedErr?.message || 'Внутренняя ошибка сервера галереи'
-		});
+		return sendJson(res, status, { error: msg });
 	}
 }
