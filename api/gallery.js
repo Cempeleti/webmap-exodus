@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { put, list, del } from '@vercel/blob';
+import { put, list, del, get } from '@vercel/blob';
 
 /** @typedef {{ url: string; token: string }} KvConfig */
 /** @typedef {{ token?: string; repo: string; branch: string }} GhConfig */
@@ -172,6 +172,63 @@ function detectStorageBackend() {
 
 // ---------------- Vercel Blob Backend ----------------
 
+/** @type {'public' | 'private'} */
+let blobAccessMode = process.env.BLOB_ACCESS === 'private' ? 'private' : 'public';
+
+/**
+ * @param {string} pathname
+ * @param {string | Buffer} body
+ * @param {{ addRandomSuffix?: boolean; allowOverwrite?: boolean; contentType?: string }} opts
+ */
+async function blobPutSmart(pathname, body, opts) {
+	try {
+		return await put(pathname, body, { ...opts, access: blobAccessMode });
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		if (blobAccessMode === 'public' && msg.toLowerCase().includes('private')) {
+			blobAccessMode = 'private';
+			return await put(pathname, body, { ...opts, access: 'private' });
+		}
+		throw err;
+	}
+}
+
+/**
+ * @param {string} pathname
+ * @param {string} [fallbackUrl]
+ * @returns {Promise<{ buffer: Buffer; contentType: string } | null>}
+ */
+async function blobReadSmart(pathname, fallbackUrl) {
+	if (blobAccessMode === 'public' && fallbackUrl) {
+		try {
+			const r = await fetch(fallbackUrl);
+			if (r.ok) {
+				const arr = await r.arrayBuffer();
+				return {
+					buffer: Buffer.from(arr),
+					contentType: r.headers.get('content-type') || 'application/octet-stream'
+				};
+			}
+		} catch {}
+	}
+
+	const tryOrder = blobAccessMode === 'private' ? /** @type {const} */ (['private', 'public']) : /** @type {const} */ (['private', 'public']);
+	for (const access of tryOrder) {
+		try {
+			const result = await get(pathname, { access, useCache: false });
+			if (result && result.statusCode === 200 && result.stream) {
+				if (access === 'private') blobAccessMode = 'private';
+				const buf = Buffer.from(await new Response(result.stream).arrayBuffer());
+				return {
+					buffer: buf,
+					contentType: result.blob.contentType || 'application/octet-stream'
+				};
+			}
+		} catch {}
+	}
+	return null;
+}
+
 /** @param {string} prefix */
 async function blobListAll(prefix) {
 	/** @type {Awaited<ReturnType<typeof list>>['blobs']} */
@@ -206,9 +263,9 @@ async function blobGetAll() {
 	const items = await Promise.all(
 		metaBlobs.map(async (mb) => {
 			try {
-				const r = await fetch(mb.url);
-				if (!r.ok) return null;
-				const meta = await r.json();
+				const loaded = await blobReadSmart(mb.pathname, mb.url);
+				if (!loaded) return null;
+				const meta = JSON.parse(loaded.buffer.toString('utf8'));
 				const voteCount = votesByShuttle.get(meta.id);
 				return sanitizeShuttlePublic({
 					...meta,
@@ -229,12 +286,20 @@ async function blobGetAll() {
 async function blobGetOne(id) {
 	const blobs = await blobListAll(`${BLOB_META_PREFIX}${id}.json`);
 	if (blobs.length === 0) return null;
-	const r = await fetch(blobs[0].url);
-	if (!r.ok) return null;
-	const meta = await r.json();
+	const loaded = await blobReadSmart(blobs[0].pathname, blobs[0].url);
+	if (!loaded) return null;
+	const meta = JSON.parse(loaded.buffer.toString('utf8'));
 	const voteBlobs = await blobListAll(`${BLOB_LIKES_PREFIX}${id}/`);
+	let yamlContent = meta.yamlContent;
+	if (!yamlContent) {
+		const yamlLoaded = await blobReadSmart(`community-shuttles/maps/${id}.yml`);
+		if (yamlLoaded) {
+			yamlContent = yamlLoaded.buffer.toString('utf8');
+		}
+	}
 	return {
 		...meta,
+		yamlContent,
 		likes: voteBlobs.length > 0 ? voteBlobs.length : meta.likes ?? 1
 	};
 }
@@ -244,24 +309,28 @@ async function blobCreate(draft) {
 	let imageUrl = draft.image;
 	const decoded = decodeImageDataUrl(draft.image);
 	if (decoded) {
-		const imgBlob = await put(`community-shuttles/images/${draft.id}.${decoded.ext}`, decoded.buffer, {
-			access: 'public',
+		const imgBlob = await blobPutSmart(`community-shuttles/images/${draft.id}.${decoded.ext}`, decoded.buffer, {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: decoded.contentType
 		});
-		imageUrl = imgBlob.url;
+		imageUrl =
+			blobAccessMode === 'private'
+				? `/api/gallery?blob=${encodeURIComponent(imgBlob.pathname)}`
+				: imgBlob.url;
 	}
 
 	let yamlUrl = draft.yamlUrl;
 	if (draft.yamlContent) {
-		const yamlBlob = await put(`community-shuttles/maps/${draft.id}.yml`, draft.yamlContent, {
-			access: 'public',
+		const yamlBlob = await blobPutSmart(`community-shuttles/maps/${draft.id}.yml`, draft.yamlContent, {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'text/yaml; charset=utf-8'
 		});
-		yamlUrl = yamlBlob.url;
+		yamlUrl =
+			blobAccessMode === 'private'
+				? `/api/gallery?blob=${encodeURIComponent(yamlBlob.pathname)}`
+				: yamlBlob.url;
 	}
 
 	const meta = {
@@ -284,14 +353,12 @@ async function blobCreate(draft) {
 	};
 
 	await Promise.all([
-		put(`${BLOB_META_PREFIX}${draft.id}.json`, JSON.stringify(meta), {
-			access: 'public',
+		blobPutSmart(`${BLOB_META_PREFIX}${draft.id}.json`, JSON.stringify(meta), {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'application/json; charset=utf-8'
 		}),
-		put(`${BLOB_LIKES_PREFIX}${draft.id}/author.txt`, '1', {
-			access: 'public',
+		blobPutSmart(`${BLOB_LIKES_PREFIX}${draft.id}/author.txt`, '1', {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'text/plain'
@@ -310,8 +377,7 @@ async function blobToggleLike(id, voterId, liked) {
 	const safeVoter = String(voterId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'anon';
 	const votePath = `${BLOB_LIKES_PREFIX}${id}/${safeVoter}.txt`;
 	if (liked) {
-		await put(votePath, '1', {
-			access: 'public',
+		await blobPutSmart(votePath, '1', {
 			addRandomSuffix: false,
 			allowOverwrite: true,
 			contentType: 'text/plain'
@@ -335,20 +401,26 @@ async function blobDelete(id, token) {
 	if (blobs.length === 0) {
 		throw httpError('Шаттл не найден.', 404);
 	}
-	const r = await fetch(blobs[0].url);
-	if (!r.ok) {
+	const loaded = await blobReadSmart(blobs[0].pathname, blobs[0].url);
+	if (!loaded) {
 		throw httpError('Шаттл не найден.', 404);
 	}
-	const meta = await r.json();
+	const meta = JSON.parse(loaded.buffer.toString('utf8'));
 	if (!token || sha256(token) !== meta.deleteTokenHash) {
 		throw httpError('Нет прав на удаление этого шаттла.', 403);
 	}
 
-	const toDelete = [blobs[0].url];
-	if (meta.image && meta.image.includes('blob.vercel-storage.com')) toDelete.push(meta.image);
-	if (meta.yamlUrl && meta.yamlUrl.includes('blob.vercel-storage.com')) toDelete.push(meta.yamlUrl);
-	const voteBlobs = await blobListAll(`${BLOB_LIKES_PREFIX}${id}/`);
-	for (const vb of voteBlobs) toDelete.push(vb.url);
+	const [imgBlobs, mapBlobs, voteBlobs] = await Promise.all([
+		blobListAll(`community-shuttles/images/${id}.`),
+		blobListAll(`community-shuttles/maps/${id}.`),
+		blobListAll(`${BLOB_LIKES_PREFIX}${id}/`)
+	]);
+	const toDelete = [
+		blobs[0].url,
+		...imgBlobs.map((b) => b.url),
+		...mapBlobs.map((b) => b.url),
+		...voteBlobs.map((b) => b.url)
+	];
 
 	await del(toDelete);
 }
@@ -817,6 +889,25 @@ export default async function handler(req, res) {
 
 	const query = parseQuery(req);
 	const backend = detectStorageBackend();
+
+	// Serve private Vercel Blob image/map assets when store uses private access
+	const blobParam = query.get('blob');
+	if (req.method === 'GET' && blobParam && backend === 'blob') {
+		if (!blobParam.startsWith('community-shuttles/images/') && !blobParam.startsWith('community-shuttles/maps/')) {
+			return sendJson(res, 403, { error: 'Forbidden' });
+		}
+		try {
+			const loaded = await blobReadSmart(blobParam);
+			if (!loaded) return sendJson(res, 404, { error: 'Not found' });
+			res.statusCode = 200;
+			res.setHeader('Access-Control-Allow-Origin', '*');
+			res.setHeader('Content-Type', loaded.contentType);
+			res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+			return res.end(loaded.buffer);
+		} catch {
+			return sendJson(res, 404, { error: 'Not found' });
+		}
+	}
 
 	// Serve local assets in dev mode
 	const assetParam = query.get('asset');

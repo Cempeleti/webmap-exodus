@@ -216,7 +216,8 @@
 	let imageSrc = $derived(
 		shuttle?.image?.startsWith('data:') ||
 			shuttle?.image?.startsWith('http://') ||
-			shuttle?.image?.startsWith('https://')
+			shuttle?.image?.startsWith('https://') ||
+			shuttle?.image?.startsWith('/api/')
 			? shuttle.image
 			: shuttle
 				? asset(shuttle.image as `/${string}`)
