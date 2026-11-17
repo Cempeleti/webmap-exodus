@@ -2,14 +2,16 @@
 	import Button from '$lib/button.svelte';
 	import ImageModal from '$lib/image-modal.svelte';
 	import {
+		fetchCommunityShuttles,
 		getCommunityShuttles,
-		toggleCommunityLike,
+		toggleCommunityLikeRemote,
 		isCommunityShuttleLiked,
-		publishToCommunity,
-		deleteCommunitySubmission,
-		importCommunityShuttle,
-		getUserGallery,
-		deleteFromUserGallery,
+		publishToCommunityRemote,
+		deleteCommunitySubmissionRemote,
+		importCommunityShuttleRemote,
+		canDeleteCommunityShuttle,
+		getUserGalleryAsync,
+		deleteFromUserGalleryAsync,
 		shuttleConfig,
 		type CommunityShuttle,
 		type UserGalleryItem
@@ -23,6 +25,9 @@
 
 	let communityList = $state<CommunityShuttle[]>([]);
 	let personalList = $state<UserGalleryItem[]>([]);
+	let isLoadingCommunity = $state(true);
+	let storageConfigured = $state(true);
+	let storageMode = $state('unknown');
 
 	let searchQuery = $state('');
 	let selectedSize = $state('all');
@@ -38,6 +43,8 @@
 	let publishTarget = $state<UserGalleryItem | null>(null);
 	let publishAuthor = $state('Инженер Станции');
 	let publishTags = $state('боевой, кастом');
+	let isPublishing = $state(false);
+	let publishError = $state<string | null>(null);
 
 	// Import Modal State
 	let showImportModal = $state(false);
@@ -52,22 +59,40 @@
 		}, 3000);
 	}
 
-	function refreshData() {
-		if (browser) {
+	async function refreshCommunity() {
+		if (!browser) return;
+		isLoadingCommunity = true;
+		try {
+			const res = await fetchCommunityShuttles();
+			communityList = res.shuttles;
+			storageConfigured = res.configured;
+			storageMode = res.storageMode;
+		} catch {
 			communityList = getCommunityShuttles();
-			personalList = getUserGallery();
-			const storedNick = localStorage.getItem('webmap_author_nickname');
-			if (storedNick) publishAuthor = storedNick;
+		} finally {
+			isLoadingCommunity = false;
 		}
+	}
+
+	async function refreshPersonal() {
+		if (!browser) return;
+		personalList = await getUserGalleryAsync();
+	}
+
+	async function refreshData() {
+		if (!browser) return;
+		const storedNick = localStorage.getItem('webmap_author_nickname');
+		if (storedNick) publishAuthor = storedNick;
+		await Promise.all([refreshCommunity(), refreshPersonal()]);
 	}
 
 	onMount(() => {
 		refreshData();
 		const handleCommunity = () => {
-			if (browser) communityList = getCommunityShuttles();
+			refreshCommunity();
 		};
 		const handlePersonal = () => {
-			if (browser) personalList = getUserGallery();
+			refreshPersonal();
 		};
 
 		window.addEventListener('webmap:community_updated', handleCommunity);
@@ -188,9 +213,18 @@
 		return list;
 	});
 
-	function handleToggleLike(id: string) {
-		toggleCommunityLike(id);
-		communityList = getCommunityShuttles();
+	async function handleToggleLike(id: string) {
+		const currentlyLiked = isCommunityShuttleLiked(id);
+		const delta = currentlyLiked ? -1 : 1;
+		communityList = communityList.map((item) =>
+			item.id === id ? { ...item, likes: Math.max(0, (item.likes ?? 0) + delta) } : item
+		);
+		const result = await toggleCommunityLikeRemote(id);
+		if (typeof result.likes === 'number') {
+			communityList = communityList.map((item) =>
+				item.id === id ? { ...item, likes: result.likes } : item
+			);
+		}
 	}
 
 	function handleEditCommunity(item: CommunityShuttle) {
@@ -228,24 +262,40 @@
 		document.body.removeChild(a);
 	}
 
-	function handleDownloadYaml(item: { name: string; yamlContent?: string; yamlUrl?: string; mapPath?: string }) {
+	async function handleDownloadYaml(item: { name: string; yamlContent?: string; yamlUrl?: string; mapPath?: string }) {
+		const fileName = `${item.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'shuttle'}.yml`;
 		if (item.yamlContent) {
 			const blob = new Blob([item.yamlContent], { type: 'text/yaml' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `${item.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'shuttle'}.yml`;
+			a.download = fileName;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
 			URL.revokeObjectURL(url);
 		} else if (item.yamlUrl) {
-			window.open(item.yamlUrl, '_blank');
+			try {
+				const res = await fetch(item.yamlUrl);
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const text = await res.text();
+				const blob = new Blob([text], { type: 'text/yaml' });
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = fileName;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(url);
+			} catch {
+				window.open(item.yamlUrl, '_blank');
+			}
 		} else if (item.mapPath) {
 			const resolvedPath = `${base}/${item.mapPath.startsWith('static/') ? item.mapPath.slice(7) : `editor/${item.mapPath}`}`;
 			const a = document.createElement('a');
 			a.href = resolvedPath;
-			a.download = `${item.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'shuttle'}.yml`;
+			a.download = fileName;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
@@ -280,60 +330,73 @@
 		}
 	}
 
-	function handleDeletePersonal(item: UserGalleryItem) {
+	async function handleDeletePersonal(item: UserGalleryItem) {
 		if (confirm(`Удалить «${item.name}» из личной галереи?`)) {
-			deleteFromUserGallery(item.id);
-			refreshData();
+			await deleteFromUserGalleryAsync(item.id);
+			await refreshPersonal();
 			showToast('Шаттл удален из вашей галереи');
 		}
 	}
 
-	function handleDeleteCommunitySubmission(item: CommunityShuttle) {
+	async function handleDeleteCommunitySubmission(item: CommunityShuttle) {
 		if (confirm(`Удалить вашу публикацию «${item.name}» из общественной галереи?`)) {
-			deleteCommunitySubmission(item.id);
-			refreshData();
-			showToast('Публикация удалена из общественной галереи');
+			try {
+				await deleteCommunitySubmissionRemote(item.id);
+				await refreshCommunity();
+				showToast('Публикация удалена из общественной галереи');
+			} catch (e: any) {
+				showToast(`⚠️ ${e?.message || 'Не удалось удалить публикацию'}`);
+			}
 		}
 	}
 
 	function openPublishModal(item: UserGalleryItem) {
 		publishTarget = item;
 		publishTags = 'боевой, кастом';
+		publishError = null;
 		showPublishModal = true;
 	}
 
-	function confirmPublish() {
-		if (!publishTarget) return;
+	async function confirmPublish() {
+		if (!publishTarget || isPublishing) return;
+		isPublishing = true;
+		publishError = null;
 		const tags = publishTags
 			.split(',')
 			.map((t) => t.trim())
 			.filter(Boolean);
 
-		publishToCommunity({
-			name: publishTarget.name,
-			author: publishAuthor.trim() || 'Инженер Станции',
-			description: publishTarget.description,
-			tileWidth: publishTarget.tileWidth,
-			tileHeight: publishTarget.tileHeight,
-			entityCount: publishTarget.entityCount,
-			size: publishTarget.size,
-			hullClass: publishTarget.hullClass,
-			image: publishTarget.image,
-			yamlContent: publishTarget.yamlContent,
-			shareUrl: publishTarget.shareUrl,
-			shareExpiresAt: publishTarget.shareExpiresAt,
-			tags
-		});
+		try {
+			await publishToCommunityRemote({
+				name: publishTarget.name,
+				author: publishAuthor.trim() || 'Инженер Станции',
+				description: publishTarget.description,
+				tileWidth: publishTarget.tileWidth,
+				tileHeight: publishTarget.tileHeight,
+				entityCount: publishTarget.entityCount,
+				size: publishTarget.size,
+				hullClass: publishTarget.hullClass,
+				image: publishTarget.image,
+				yamlContent: publishTarget.yamlContent,
+				shareUrl: publishTarget.shareUrl,
+				shareExpiresAt: publishTarget.shareExpiresAt,
+				tags
+			});
 
-		if (browser) {
-			localStorage.setItem('webmap_author_nickname', publishAuthor.trim());
+			if (browser) {
+				localStorage.setItem('webmap_author_nickname', publishAuthor.trim());
+			}
+
+			showPublishModal = false;
+			publishTarget = null;
+			activeTab = 'community';
+			await refreshCommunity();
+			showToast('✨ Шаттл успешно опубликован для всех!');
+		} catch (e: any) {
+			publishError = e?.message || 'Не удалось опубликовать шаттл в общественную галерею';
+		} finally {
+			isPublishing = false;
 		}
-
-		showPublishModal = false;
-		publishTarget = null;
-		activeTab = 'community';
-		refreshData();
-		showToast('✨ Шаттл успешно опубликован в общественную галерею!');
 	}
 
 	async function handleImportLink() {
@@ -360,12 +423,12 @@
 				throw new Error('Некорректный манифест шаттла');
 			}
 
-			importCommunityShuttle(manifest);
+			await importCommunityShuttleRemote(manifest);
 			showImportModal = false;
 			importInput = '';
 			activeTab = 'community';
-			refreshData();
-			showToast('Шаттл успешно импортирован в общественную галерею!');
+			await refreshCommunity();
+			showToast('Шаттл успешно импортирован для всех в общественную галерею!');
 		} catch (e: any) {
 			importError = e.message || 'Не удалось загрузить шаттл по ссылке';
 		} finally {
@@ -523,8 +586,24 @@
 
 	<!-- Gallery Content -->
 	{#if activeTab === 'community'}
+		{#if !storageConfigured && storageMode === 'unconfigured'}
+			<div class="storage-warning-banner">
+				<span class="warn-icon">⚠️</span>
+				<div>
+					<strong>Серверное хранилище на Vercel ещё не подключено.</strong>
+					<span>Чтобы шаттлы сохранялись для всех пользователей, откройте проект в панели Vercel → <b>Storage → Create Database → Blob</b> (или добавьте переменную окружения <code>GITHUB_TOKEN</code>) и сделайте Redeploy.</span>
+				</div>
+			</div>
+		{/if}
+
 		<!-- Community Grid -->
-		{#if communityList.length === 0}
+		{#if isLoadingCommunity && communityList.length === 0}
+			<div class="empty-state">
+				<div class="empty-icon">⏳</div>
+				<h2 class="empty-title">Загрузка общественной галереи...</h2>
+				<p class="empty-desc">Получаем список шаттлов, опубликованных игроками.</p>
+			</div>
+		{:else if communityList.length === 0}
 			<div class="empty-state">
 				<div class="empty-icon">🛰️</div>
 				<h2 class="empty-title">В общественной галерее пока нет опубликованных шаттлов</h2>
@@ -616,7 +695,7 @@
 									<span class="author-icon">👤</span>
 									{item.author}
 								</span>
-								{#if item.isUserSubmission}
+								{#if canDeleteCommunityShuttle(item)}
 									<span class="my-badge">Вы автор</span>
 								{/if}
 								{#if item.featured}
@@ -694,7 +773,7 @@
 									<span>🔗</span>
 								</button>
 
-								{#if item.isUserSubmission}
+								{#if canDeleteCommunityShuttle(item)}
 									<button
 										class="action-btn btn-icon btn-del"
 										onclick={() => handleDeleteCommunitySubmission(item)}
@@ -918,13 +997,19 @@
 				</div>
 
 				<p class="modal-hint">
-					Шаттл станет доступен во вкладке «Общественная галерея» для всех посетителей этой страницы.
+					Шаттл станет доступен во вкладке «Общественная галерея» для всех посетителей сайта.
 				</p>
+
+				{#if publishError}
+					<div class="form-error">⚠️ {publishError}</div>
+				{/if}
 			</div>
 
 			<div class="modal-footer">
-				<button class="btn-cancel" onclick={() => (showPublishModal = false)}>Отмена</button>
-				<button class="btn-confirm-pub" onclick={confirmPublish}>Опубликовать</button>
+				<button class="btn-cancel" onclick={() => (showPublishModal = false)} disabled={isPublishing}>Отмена</button>
+				<button class="btn-confirm-pub" onclick={confirmPublish} disabled={isPublishing}>
+					{isPublishing ? '⏳ Публикация...' : 'Опубликовать'}
+				</button>
 			</div>
 		</div>
 	</div>
@@ -1813,6 +1898,30 @@
 	.btn-confirm-pub:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.storage-warning-banner {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		padding: 14px 18px;
+		border-radius: var(--radius);
+		background: rgba(245, 158, 11, 0.12);
+		border: 1px solid rgba(245, 158, 11, 0.4);
+		color: #fde68a;
+		font-size: 0.88rem;
+		line-height: 1.5;
+	}
+	.storage-warning-banner .warn-icon {
+		font-size: 1.2rem;
+		line-height: 1.2;
+	}
+	.storage-warning-banner code {
+		padding: 1px 5px;
+		border-radius: 4px;
+		background: rgba(0, 0, 0, 0.35);
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
 	}
 
 	/* Toast */

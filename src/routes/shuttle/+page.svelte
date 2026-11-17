@@ -5,7 +5,9 @@
 		formatPrice,
 		getShuttleById,
 		getUserGalleryItem,
+		getUserGalleryItemAsync,
 		getCommunityShuttleById,
+		fetchCommunityShuttleById,
 		shuttleConfig,
 		shuttleGroupColors,
 		type Shuttle,
@@ -42,38 +44,49 @@
 		// 0. Community shuttle item
 		if (communityIdParam) {
 			const comm = getCommunityShuttleById(communityIdParam);
-			if (comm) {
+			const applyComm = (item: NonNullable<typeof comm>) => {
 				customShuttle = {
-					id: comm.id,
-					name: comm.name,
-					author: comm.author,
-					description: comm.description,
+					id: item.id,
+					name: item.name,
+					author: item.author,
+					description: item.description,
 					price: 0,
-					group: (comm.group as ShuttleGroup) || 'custom',
-					hullClass: (comm.hullClass as ShuttleHullClass) || 'shuttle',
-					size: comm.size,
+					group: (item.group as ShuttleGroup) || 'custom',
+					hullClass: (item.hullClass as ShuttleHullClass) || 'shuttle',
+					size: item.size,
 					classes: ['civilian'],
 					engines: ['plasma'],
-					image: comm.image,
-					tags: comm.tags,
-					tileWidth: comm.tileWidth,
-					tileHeight: comm.tileHeight,
-					entityCount: comm.entityCount,
-					mapPath: comm.mapPath,
-					yamlUrl: comm.yamlUrl || comm.shareUrl,
-					yamlContent: comm.yamlContent,
-					createdAt: comm.createdAt,
-					expiresAt: comm.shareExpiresAt,
+					image: item.image,
+					tags: item.tags,
+					tileWidth: item.tileWidth,
+					tileHeight: item.tileHeight,
+					entityCount: item.entityCount,
+					mapPath: item.mapPath,
+					yamlUrl: item.yamlUrl || item.shareUrl,
+					yamlContent: item.yamlContent,
+					createdAt: item.createdAt,
+					expiresAt: item.shareExpiresAt,
 					isShared: false
 				};
-				return;
+			};
+			if (comm) {
+				applyComm(comm);
+			} else {
+				isLoadingShared = true;
+				fetchCommunityShuttleById(communityIdParam)
+					.then((remote) => {
+						if (remote) applyComm(remote);
+					})
+					.finally(() => {
+						isLoadingShared = false;
+					});
 			}
+			return;
 		}
 
 		// 1. User gallery item
 		if (galleryIdParam) {
-			const item = getUserGalleryItem(galleryIdParam);
-			if (item) {
+			const applyUserItem = (item: NonNullable<ReturnType<typeof getUserGalleryItem>>) => {
 				customShuttle = {
 					id: item.id,
 					name: item.name,
@@ -94,8 +107,16 @@
 					expiresAt: item.shareExpiresAt,
 					isShared: false
 				};
-				return;
+			};
+			const item = getUserGalleryItem(galleryIdParam);
+			if (item) {
+				applyUserItem(item);
+			} else {
+				getUserGalleryItemAsync(galleryIdParam).then((asyncItem) => {
+					if (asyncItem) applyUserItem(asyncItem);
+				});
 			}
+			return;
 		}
 
 		// 2. Shared shuttle via URL query
@@ -238,13 +259,25 @@
 		document.body.removeChild(a);
 	}
 
-	function handleDownloadYaml() {
-		if (!shuttle?.yamlContent) return;
-		const blob = new Blob([shuttle.yamlContent], { type: 'text/yaml;charset=utf-8' });
+	async function handleDownloadYaml() {
+		if (!shuttle) return;
+		const fileName = `${(shuttle.name || 'shuttle').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.yml`;
+		let content = shuttle.yamlContent;
+		if (!content && shuttle.yamlUrl) {
+			try {
+				const res = await fetch(shuttle.yamlUrl);
+				if (res.ok) content = await res.text();
+			} catch {
+				window.open(shuttle.yamlUrl, '_blank');
+				return;
+			}
+		}
+		if (!content) return;
+		const blob = new Blob([content], { type: 'text/yaml;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `${(shuttle.name || 'shuttle').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}.yml`;
+		a.download = fileName;
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
@@ -275,7 +308,14 @@
 	{/if}
 </svelte:head>
 
-{#if !shuttle}
+{#if isLoadingShared && !shuttle}
+	<div class="not-found-page">
+		<div class="not-found-inner">
+			<span class="not-found-title">⏳ Загрузка шаттла...</span>
+			<span class="not-found-sub">Получаем данные из общей галереи</span>
+		</div>
+	</div>
+{:else if !shuttle}
 	<div class="not-found-page">
 		<div class="not-found-inner">
 			<div class="not-found-icon" aria-hidden="true">

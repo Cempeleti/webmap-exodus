@@ -29,3 +29,4 @@ maps_to_render.txt
 /static/editor/resources/Prototypes/
 /editor/public/resources/Prototypes/
 .claude/
+.local-gallery/

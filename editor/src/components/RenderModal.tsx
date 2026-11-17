@@ -4,8 +4,8 @@ import type { EditorState } from '../state/editorState';
 import { exportMap } from '../export/mapExporter';
 import { createShuttleShareLink } from '../services/shareService';
 import {
-  saveSnapshotToGallery,
-  publishSnapshotToCommunity,
+  saveSnapshotToGalleryAsync,
+  publishSnapshotToCommunityRemote,
 } from '../services/galleryService';
 
 interface Props {
@@ -45,12 +45,14 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
     return 'Инженер Станции';
   });
   const [tagsInput, setTagsInput] = useState('кастом, шаттл');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [publishedToCommunity, setPublishedToCommunity] = useState(false);
   const [publishedCommunityId, setPublishedCommunityId] = useState<string | null>(null);
 
-  const handleSaveToGallery = () => {
+  const handleSaveToGallery = async () => {
     try {
-      const item = saveSnapshotToGallery(
+      const item = await saveSnapshotToGalleryAsync(
         snapshot,
         state,
         shuttleName,
@@ -65,13 +67,15 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
     }
   };
 
-  const handlePublishToCommunity = () => {
+  const handlePublishToCommunity = async () => {
+    setIsPublishing(true);
+    setPublishError(null);
     try {
       const tags = tagsInput
         .split(',')
         .map((t) => t.trim())
         .filter(Boolean);
-      const item = publishSnapshotToCommunity(
+      const item = await publishSnapshotToCommunityRemote(
         snapshot,
         state,
         shuttleName,
@@ -86,9 +90,12 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
       setPublishedCommunityId(item.id);
       setPublishedToCommunity(true);
       setShowCommunityForm(false);
-      setTimeout(() => setPublishedToCommunity(false), 5000);
+      setTimeout(() => setPublishedToCommunity(false), 6000);
     } catch (e) {
-      alert(`Не удалось опубликовать: ${e}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      setPublishError(msg || 'Не удалось опубликовать шаттл');
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -399,25 +406,31 @@ export const RenderModal: React.FC<Props> = ({ snapshot, state, onClose }) => {
                       className="w-full px-2.5 py-1.5 text-xs bg-[#0b0817] border border-[#4c2889] rounded text-white focus:outline-none focus:border-[#a855f7]"
                     />
                   </div>
+                  {publishError && (
+                    <div className="p-2 bg-red-950/70 border border-red-800/80 rounded text-[11px] text-red-200 leading-snug">
+                      ⚠️ {publishError}
+                    </div>
+                  )}
                   <button
                     onClick={handlePublishToCommunity}
-                    className="w-full py-2 bg-[#9333ea] hover:bg-[#7e22ce] text-white font-semibold text-xs rounded transition-colors cursor-pointer"
+                    disabled={isPublishing}
+                    className="w-full py-2 bg-[#9333ea] hover:bg-[#7e22ce] disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-xs rounded transition-colors cursor-pointer"
                   >
-                    Подтвердить и опубликовать
+                    {isPublishing ? '⏳ Публикация...' : 'Подтвердить и опубликовать'}
                   </button>
                 </div>
               )}
 
               {publishedToCommunity && (
                 <div className="flex items-center justify-between px-2.5 py-1.5 bg-purple-950/50 border border-purple-800/60 rounded text-[11px] text-purple-200 animate-in fade-in">
-                  <span>✨ Опубликовано в сообщество!</span>
+                  <span>✨ Опубликовано для всех!</span>
                   <a
-                    href="../gallery"
+                    href={publishedCommunityId ? `../shuttle?communityId=${encodeURIComponent(publishedCommunityId)}` : '../gallery'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline text-purple-300 hover:text-white"
                   >
-                    Открыть галерею ↗
+                    Открыть шаттл ↗
                   </a>
                 </div>
               )}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "build",
+  "rewrites": [
+    { "source": "/gallery", "destination": "/gallery.html" },
+    { "source": "/shuttle", "destination": "/shuttle.html" },
+    { "source": "/editor", "destination": "/editor.html" }
+  ]
+}
