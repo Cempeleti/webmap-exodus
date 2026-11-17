@@ -103,7 +103,17 @@ function inferSmoothMode(
  */
 export function extractSpriteInfo(components: RawComponent[]): SpriteInfo | null {
   const spriteComp = components.find(c => c.type === 'Sprite');
-  if (!spriteComp) return null;
+  const iconComp = components.find(c => c.type === 'Icon');
+  if (!spriteComp) {
+    if (iconComp && (iconComp.sprite || iconComp.state)) {
+      return {
+        rsiPath: (iconComp.sprite as string) ? normalizeRsiPath(iconComp.sprite as string) : '',
+        baseState: (iconComp.state as string) ?? '',
+        layers: [],
+      };
+    }
+    return null;
+  }
 
   const rawLayers = (spriteComp.layers ?? []) as Array<Record<string, unknown>>;
   const layers: SpriteLayerInfo[] = rawLayers.map(l => ({
@@ -159,16 +169,20 @@ export function extractSpriteInfo(components: RawComponent[]): SpriteInfo | null
   // E.g., GasVentPump layers[0] has sprite=pipe.rsi with state=pipeUnaryConnectors,
   // but the top-level sprite is vent.rsi, we want layers[1].state=vent_off.
   const directState = spriteComp.state as string | undefined;
-  let baseState = directState ?? '';
-  for (const layer of layers) {
+  const visibleLayers = layers.filter(l => l.visible !== false);
+  let baseState = visibleLayers.length > 0 ? '' : (directState ?? '');
+  for (const layer of visibleLayers) {
     if (!layer.state) continue;
     // If this layer has a sprite override pointing to a different RSI, skip it
     if (layer.sprite && layer.sprite !== rsiPath) continue;
     baseState = layer.state;
     break;
   }
-  if (!baseState && layers[0]?.state) {
-    baseState = layers[0].state;
+  if (!baseState && visibleLayers[0]?.state) {
+    baseState = visibleLayers[0].state;
+  }
+  if (!baseState && directState && layers.length > 0) {
+    baseState = directState;
   }
 
   // EntityStorageVisuals override: lockers/crates define their closed-state sprite

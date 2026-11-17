@@ -39,22 +39,31 @@ export const TilePalette: React.FC<Props> = ({ registry, selectedItem, onSelect 
 
   return (
     <div className="flex-1 bg-surface flex flex-col overflow-hidden">
-      <div className="px-2 pt-2 pb-1 text-xs text-muted">Tiles</div>
+      <div className="px-2.5 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-muted">Палитра тайлов</div>
 
       {selectedItem && selectedItem.type === 'tile' && (
-        <div className="px-2 pb-2 border-b border-subtle text-[11px] text-primary">
-          Selected: <strong>{selectedItem.id}</strong>
+        <div className="px-2.5 pb-2 border-b border-subtle text-[11px] text-primary truncate">
+          Выбрано: <strong className="text-accent">{selectedItem.id}</strong>
         </div>
       )}
 
-      <div className="px-2 py-1">
+      <div className="px-2 py-1.5 relative">
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search tiles..."
-          className="w-full px-2 py-1 bg-surface border border-subtle rounded-sm text-primary text-xs outline-none focus:border-accent"
+          placeholder="Поиск тайлов..."
+          className="w-full px-2.5 py-1 pr-6 bg-panel border border-subtle rounded text-primary text-xs outline-none placeholder:text-muted focus:border-accent transition-colors"
         />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-primary text-xs bg-transparent border-none cursor-pointer"
+            title="Очистить"
+          >
+            ×
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-1.5 p-2 overflow-y-auto flex-1 content-start">
@@ -78,8 +87,8 @@ export const TilePalette: React.FC<Props> = ({ registry, selectedItem, onSelect 
         <TilePreviewPopup tileId={hovered.id} registry={registry} anchorRect={hovered.rect} />
       )}
 
-      <div className="px-2 py-1 text-[10px] text-muted border-t border-subtle">
-        {filtered.length} tiles
+      <div className="px-2.5 py-1 text-[10px] font-mono text-muted border-t border-subtle">
+        {filtered.length} тайлов
       </div>
     </div>
   );

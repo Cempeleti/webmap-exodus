@@ -11,6 +11,11 @@ import { statsSetVisibleEntities, statsSetLodActive, statsAddDrawCalls } from '.
 
 const TILE_SIZE = 32;
 
+export interface SpriteLayerDrawInfo extends SpriteDrawInfo {
+  color?: string;
+  scale?: { x: number; y: number };
+}
+
 export interface CenteredSpriteRect {
   x: number;
   y: number;
@@ -514,26 +519,43 @@ export function getEntitySprite(
   if (!loadingSet.has(cacheKey)) {
     loadingSet.add(cacheKey);
 
-    const spriteInfo = registry.getSpriteInfo(prototype);
+    const spriteInfo = registry.getSpriteInfo?.(prototype);
     if (!spriteInfo) {
       entitySpriteCache.set(cacheKey, null);
       loadingSet.delete(cacheKey);
       return null;
     }
 
-    let effectiveSpriteInfo = spriteInfo;
-    if (!effectiveSpriteInfo.rsiPath && effectiveSpriteInfo.layers && effectiveSpriteInfo.layers.length > 0) {
-      const layerWithSprite = effectiveSpriteInfo.layers.find(l => l.sprite);
-      if (layerWithSprite?.sprite) {
-        effectiveSpriteInfo = {
-          ...effectiveSpriteInfo,
-          rsiPath: layerWithSprite.sprite,
-          baseState: effectiveSpriteInfo.baseState || layerWithSprite.state || '',
-        };
-      }
-    }
+    const visibleLayers = (spriteInfo.layers ?? []).filter(
+      (l) => l.visible !== false && (Boolean(l.state) || Boolean(l.sprite)),
+    );
 
-    loadSprite(effectiveSpriteInfo, direction, 0, stateOverride)
+    const resolveSprite = async (): Promise<SpriteDrawInfo | null> => {
+      if (stateOverride) {
+        return loadSprite(spriteInfo, direction, 0, stateOverride);
+      }
+
+      if (visibleLayers.length > 0) {
+        for (const layer of visibleLayers) {
+          const candidateRsi = layer.sprite || spriteInfo.rsiPath;
+          const candidateState = layer.state || spriteInfo.baseState;
+          if (!candidateRsi || !candidateState) continue;
+          const drawInfo = await loadSprite(
+            { ...spriteInfo, rsiPath: candidateRsi, baseState: candidateState },
+            direction,
+            0,
+          );
+          if (drawInfo) return drawInfo;
+        }
+      }
+
+      if (spriteInfo.rsiPath && spriteInfo.baseState) {
+        return loadSprite(spriteInfo, direction, 0);
+      }
+      return null;
+    };
+
+    resolveSprite()
       .then((drawInfo) => {
         entitySpriteCache.set(cacheKey, drawInfo);
         markSceneDirty();
@@ -551,18 +573,18 @@ export function getEntitySprite(
 
 // ---- Extra layer loading (for multi-layer sprites like spawners) ----
 
-const extraLayerCache = new Map<string, SpriteDrawInfo[] | null>();
+const extraLayerCache = new Map<string, SpriteLayerDrawInfo[] | null>();
 const extraLayerLoadingSet = new Set<string>();
 
 /**
- * Get extra sprite layers for an entity (layers beyond the base layer).
+ * Get extra sprite layers for an entity (visible layers beyond the base layer).
  * Returns cached layers, null (no extra layers or failed), or undefined (still loading).
  */
-function getExtraLayers(
+export function getExtraLayers(
   prototype: string,
   direction: CardinalDirection,
   registry: IPrototypeRegistry,
-): SpriteDrawInfo[] | null | undefined {
+): SpriteLayerDrawInfo[] | null | undefined {
   const cacheKey = `${prototype}:${direction}:layers`;
 
   if (extraLayerCache.has(cacheKey)) {
@@ -571,33 +593,41 @@ function getExtraLayers(
 
   if (extraLayerLoadingSet.has(cacheKey)) return undefined;
 
-  const spriteInfo = registry.getSpriteInfo(prototype);
-  if (!spriteInfo || spriteInfo.layers.length <= 1) {
+  const spriteInfo = registry.getSpriteInfo?.(prototype);
+  const visibleLayers = (spriteInfo?.layers ?? []).filter(
+    (l) => l.visible !== false && (Boolean(l.state) || Boolean(l.sprite)),
+  );
+  if (!spriteInfo || visibleLayers.length <= 1) {
     extraLayerCache.set(cacheKey, null);
     return null;
   }
 
-  // Load all layers beyond the first (base layer is already rendered)
+  // Load all visible layers beyond the first (base layer is already rendered)
   extraLayerLoadingSet.add(cacheKey);
-  const layerPromises: Promise<SpriteDrawInfo | null>[] = [];
+  const layerPromises: Promise<SpriteLayerDrawInfo | null>[] = [];
 
-  for (let i = 1; i < spriteInfo.layers.length; i++) {
-    const layer = spriteInfo.layers[i];
-    if (layer.visible === false || !layer.state) continue;
+  for (let i = 1; i < visibleLayers.length; i++) {
+    const layer = visibleLayers[i];
+    const rsiPath = layer.sprite ?? spriteInfo.rsiPath;
+    const baseState = layer.state || spriteInfo.baseState;
+    if (!rsiPath || !baseState) continue;
 
-    // Layer can override the RSI path
     const layerSpriteInfo = {
       ...spriteInfo,
-      rsiPath: layer.sprite ?? spriteInfo.rsiPath,
-      baseState: layer.state,
+      rsiPath,
+      baseState,
     };
 
-    layerPromises.push(loadSprite(layerSpriteInfo, direction, 0));
+    layerPromises.push(
+      loadSprite(layerSpriteInfo, direction, 0).then((drawInfo) =>
+        drawInfo ? { ...drawInfo, color: layer.color, scale: layer.scale } : null,
+      ),
+    );
   }
 
   Promise.all(layerPromises)
     .then(results => {
-      const validLayers = results.filter((r): r is SpriteDrawInfo => r !== null);
+      const validLayers = results.filter((r): r is SpriteLayerDrawInfo => r !== null);
       extraLayerCache.set(cacheKey, validLayers.length > 0 ? validLayers : null);
       markSceneDirty();
     })
@@ -694,14 +724,17 @@ const spriteColorCache = new Map<string, string | null>();
  * Get the effective tint color for an entity's base sprite.
  * Priority: first layer's color > component-level color > null (no tint).
  */
-function getSpriteColor(prototype: string, registry: IPrototypeRegistry): string | null {
+export function getSpriteColor(prototype: string, registry: IPrototypeRegistry): string | null {
   if (spriteColorCache.has(prototype)) return spriteColorCache.get(prototype)!;
-  const spriteInfo = registry.getSpriteInfo(prototype);
+  const spriteInfo = registry.getSpriteInfo?.(prototype);
   let color: string | null = null;
   if (spriteInfo) {
-    // Check first layer's color (e.g., ComfyChair layers[0].color = "#767e82")
-    if (spriteInfo.layers.length > 0 && spriteInfo.layers[0].color) {
-      color = spriteInfo.layers[0].color;
+    // Check first visible layer's color (e.g., ComfyChair layers[0].color = "#767e82")
+    const firstVisible = spriteInfo.layers.find(
+      (l) => l.visible !== false && (Boolean(l.state) || Boolean(l.sprite)),
+    ) ?? spriteInfo.layers.find((l) => l.visible !== false);
+    if (firstVisible?.color) {
+      color = firstVisible.color;
     }
     // Component-level color (e.g., Puddle color = "#FFFFFF80")
     if (!color && spriteInfo.color) {
@@ -726,7 +759,7 @@ export function getTintedCacheSize(): number {
   return tintedSpriteCache.size;
 }
 
-function getTintedSprite(sprite: SpriteDrawInfo, color: string): HTMLCanvasElement {
+export function getTintedSprite(sprite: SpriteDrawInfo, color: string): HTMLCanvasElement {
   const key = `${sprite.image.src}:${sprite.sx},${sprite.sy}:${color}`;
 
   const cached = tintedSpriteCache.get(key);
@@ -774,6 +807,58 @@ function getTintedSprite(sprite: SpriteDrawInfo, color: string): HTMLCanvasEleme
 
   tintedSpriteCache.set(key, offscreen);
   return offscreen;
+}
+
+/** Draw a single sprite layer with optional RGBA tint and XY scale. */
+function drawSpriteLayer(
+  ctx: CanvasRenderingContext2D,
+  sprite: SpriteDrawInfo,
+  screenX: number,
+  screenY: number,
+  tileScreenSize: number,
+  tintColor: string | null | undefined,
+  spriteScale?: { x: number; y: number } | null,
+): void {
+  const hasAlpha = Boolean(tintColor && tintColor.length === 9); // #RRGGBBAA format
+  if (hasAlpha) {
+    const alpha = parseInt(tintColor!.slice(7, 9), 16) / 255;
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+  }
+
+  // Sprites larger than one tile (64x64 vehicles etc.) draw at their native
+  // RSI size centered on the tile, matching in-game rendering, instead of
+  // being squeezed into a single tile.
+  const scaledWidth = sprite.sw * Math.abs(spriteScale?.x ?? 1);
+  const scaledHeight = sprite.sh * Math.abs(spriteScale?.y ?? 1);
+  const spriteRect = getCenteredSpriteRect(
+    screenX, screenY, tileScreenSize, scaledWidth, scaledHeight,
+  );
+
+  const tinted = tintColor ? getTintedSprite(sprite, tintColor) : null;
+  const drawScaleX = spriteScale?.x ?? 1;
+  const drawScaleY = spriteScale?.y ?? 1;
+
+  ctx.save();
+  ctx.translate(spriteRect.x + spriteRect.width / 2, spriteRect.y + spriteRect.height / 2);
+  ctx.scale(Math.sign(drawScaleX) || 1, Math.sign(drawScaleY) || 1);
+  if (tinted) {
+    ctx.drawImage(
+      tinted,
+      -spriteRect.width / 2, -spriteRect.height / 2, spriteRect.width, spriteRect.height,
+    );
+  } else {
+    ctx.drawImage(
+      sprite.image,
+      sprite.sx, sprite.sy, sprite.sw, sprite.sh,
+      -spriteRect.width / 2, -spriteRect.height / 2, spriteRect.width, spriteRect.height,
+    );
+  }
+  ctx.restore();
+
+  if (hasAlpha) {
+    ctx.restore();
+  }
 }
 
 // ---- noRot cache ----
@@ -1063,61 +1148,35 @@ export function renderEntities(
     const spriteColor = !pipeColor ? getSpriteColor(prototype, registry) : null;
     const tintColor = pipeColor ?? spriteColor;
 
-    // Handle alpha from color (e.g., "#FFFFFF80" = 50% opacity)
-    const hasAlpha = tintColor && tintColor.length === 9; // #RRGGBBAA format
-    if (hasAlpha) {
-      const alpha = parseInt(tintColor!.slice(7, 9), 16) / 255;
-      ctx.save();
-      ctx.globalAlpha *= alpha;
-    }
-
-    // Sprites larger than one tile (64x64 vehicles etc.) draw at their native
-    // RSI size centered on the tile, matching in-game rendering, instead of
-    // being squeezed into a single tile.
-    const spriteScale = spriteTransform.scale;
-    const scaledWidth = sprite.sw * Math.abs(spriteScale?.x ?? 1);
-    const scaledHeight = sprite.sh * Math.abs(spriteScale?.y ?? 1);
-    const spriteRect = getCenteredSpriteRect(
-      screenX, screenY, tileScreenSize, scaledWidth, scaledHeight,
+    drawSpriteLayer(
+      ctx,
+      sprite,
+      screenX,
+      screenY,
+      tileScreenSize,
+      tintColor,
+      spriteTransform.scale,
     );
 
-    const tinted = tintColor ? getTintedSprite(sprite, tintColor) : null;
-
-    const drawScaleX = spriteScale?.x ?? 1;
-    const drawScaleY = spriteScale?.y ?? 1;
-    ctx.save();
-    ctx.translate(spriteRect.x + spriteRect.width / 2, spriteRect.y + spriteRect.height / 2);
-    ctx.scale(Math.sign(drawScaleX) || 1, Math.sign(drawScaleY) || 1);
-    if (tinted) {
-      ctx.drawImage(
-        tinted,
-        -spriteRect.width / 2, -spriteRect.height / 2, spriteRect.width, spriteRect.height,
-      );
-    } else {
-      ctx.drawImage(
-        sprite.image,
-        sprite.sx, sprite.sy, sprite.sw, sprite.sh,
-        -spriteRect.width / 2, -spriteRect.height / 2, spriteRect.width, spriteRect.height,
-      );
-    }
-    ctx.restore();
-
-    if (hasAlpha) {
-      ctx.restore();
-    }
-
-    // Draw extra sprite layers (e.g., spawner entity preview over the X marker)
+    // Draw extra sprite layers (e.g., vents over pipe base, tabletop computers, spawners)
     if (!cablePrefix) {
       const extraLayers = getExtraLayers(prototype, direction, registry);
       if (extraLayers) {
         for (const layerSprite of extraLayers) {
-          const layerRect = getCenteredSpriteRect(
-            screenX, screenY, tileScreenSize, layerSprite.sw, layerSprite.sh,
-          );
-          ctx.drawImage(
-            layerSprite.image,
-            layerSprite.sx, layerSprite.sy, layerSprite.sw, layerSprite.sh,
-            layerRect.x, layerRect.y, layerRect.width, layerRect.height,
+          const combinedScale = layerSprite.scale
+            ? {
+                x: (spriteTransform.scale?.x ?? 1) * layerSprite.scale.x,
+                y: (spriteTransform.scale?.y ?? 1) * layerSprite.scale.y,
+              }
+            : spriteTransform.scale;
+          drawSpriteLayer(
+            ctx,
+            layerSprite,
+            screenX,
+            screenY,
+            tileScreenSize,
+            layerSprite.color,
+            combinedScale,
           );
         }
       }

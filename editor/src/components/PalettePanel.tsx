@@ -23,11 +23,11 @@ export const PalettePanel: React.FC<Props> = ({ registry, selectedItem, onSelect
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex border-b border-subtle bg-surface">
-        <TabButton label="Tiles" active={activeTab === 'tiles'} onClick={() => setActiveTab('tiles')} />
-        <TabButton label="Entities" active={activeTab === 'entities'} onClick={() => setActiveTab('entities')} />
-        <TabButton label="Decals" active={activeTab === 'decals'} onClick={() => setActiveTab('decals')} />
-        <TabButton label="Prefabs" active={activeTab === 'prefabs'} onClick={() => setActiveTab('prefabs')} />
+      <div className="flex border-b border-subtle bg-surface shrink-0">
+        <TabButton label="Тайлы" active={activeTab === 'tiles'} onClick={() => setActiveTab('tiles')} />
+        <TabButton label="Сущности" active={activeTab === 'entities'} onClick={() => setActiveTab('entities')} />
+        <TabButton label="Декали" active={activeTab === 'decals'} onClick={() => setActiveTab('decals')} />
+        <TabButton label="Префабы" active={activeTab === 'prefabs'} onClick={() => setActiveTab('prefabs')} />
       </div>
 
       {activeTab === 'tiles' ? (
@@ -53,10 +53,10 @@ export const PalettePanel: React.FC<Props> = ({ registry, selectedItem, onSelect
 const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`flex-1 py-1.5 text-[11px] cursor-pointer border-none border-b-2
+    className={`flex-1 py-2 text-[11px] cursor-pointer border-none border-b-2 transition-colors
                 ${active
-                  ? 'bg-active text-white font-bold border-accent'
-                  : 'bg-surface text-muted font-normal border-transparent hover:text-primary'}`}
+                  ? 'bg-active text-accent font-semibold border-accent'
+                  : 'bg-surface text-muted font-medium border-transparent hover:text-primary hover:bg-hover/60'}`}
   >
     {label}
   </button>

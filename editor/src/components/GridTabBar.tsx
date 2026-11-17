@@ -39,7 +39,7 @@ export const GridTabBar: React.FC<Props> = ({
                 }`}
               onClick={() => onSelectGrid(idx)}
               onDoubleClick={() => {
-                const name = prompt('Rename grid:', gd.name);
+                const name = prompt('Переименовать сетку:', gd.name);
                 if (name && name !== gd.name) onRenameGrid(gd.gridUid, name);
               }}
               onAuxClick={(e) => {
@@ -50,11 +50,11 @@ export const GridTabBar: React.FC<Props> = ({
               }}
             >
               <span>{gd.name}</span>
-              <span className="text-muted text-[10px]">({gd.gridUid})</span>
+              <span className="text-muted font-mono text-[10px]">({gd.gridUid})</span>
               {grids.length > 1 && (
                 <button
                   className="ml-1 text-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Close grid"
+                  title="Закрыть сетку"
                   onClick={(e) => { e.stopPropagation(); onDeleteGrid(gd.gridUid); }}
                 >
                   ×
@@ -64,8 +64,8 @@ export const GridTabBar: React.FC<Props> = ({
           );
         })}
         <button
-          className="px-2 py-1.5 text-xs text-muted hover:text-primary hover:bg-hover"
-          title="Add new grid"
+          className="px-2.5 py-1.5 text-xs text-muted hover:text-accent hover:bg-hover transition-colors"
+          title="Добавить новую сетку (грид)"
           onClick={onAddGrid}
         >
           +
@@ -76,11 +76,11 @@ export const GridTabBar: React.FC<Props> = ({
 
       <button
         onClick={onValidate}
-        className="flex items-center gap-1 self-center text-white bg-warning hover:brightness-110 cursor-pointer border-none rounded-sm text-[11px] px-2 py-0.5 mr-2 shrink-0"
-        title="Validate Map"
+        className="flex items-center gap-1.5 self-center text-warning bg-warning/15 hover:bg-warning/25 border border-warning/40 cursor-pointer rounded text-[11px] font-medium px-2.5 py-1 mr-2 shrink-0 transition-colors"
+        title="Проверить карту на ошибки"
       >
-        <span className="text-[12px]">&#x26A0;</span>
-        <span>Validate Map</span>
+        <span className="text-[11px]">&#x26A0;</span>
+        <span>Проверить</span>
       </button>
 
       <div className="pr-2 py-0.5 shrink-0">

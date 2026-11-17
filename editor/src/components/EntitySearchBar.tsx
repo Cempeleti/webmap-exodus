@@ -95,7 +95,7 @@ export const EntitySearchBar: React.FC<Props> = ({
 
   return (
     <div ref={containerRef} className="relative flex items-center">
-      <div className="flex items-center bg-surface border border-subtle rounded-sm">
+      <div className="flex items-center bg-panel border border-subtle rounded focus-within:border-accent transition-colors">
         <input
           ref={searchInputRef as React.RefObject<HTMLInputElement>}
           type="text"
@@ -103,18 +103,18 @@ export const EntitySearchBar: React.FC<Props> = ({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => { if (query.trim()) setDropdownOpen(true); }}
-          placeholder="Search entities..."
-          className="w-[200px] px-2 py-1 bg-transparent border-none text-primary text-xs outline-none placeholder:text-muted"
+          placeholder="Найти на карте (Ctrl+F)..."
+          className="w-[210px] px-2.5 py-1 bg-transparent border-none text-primary text-xs outline-none placeholder:text-muted"
         />
         {query && (
           <>
-            <span className="text-[10px] text-muted px-1 whitespace-nowrap">
-              {results.length} result{results.length !== 1 ? 's' : ''}
+            <span className="text-[10px] font-mono text-muted px-1 whitespace-nowrap">
+              {results.length}
             </span>
             <button
               onClick={handleClear}
               className="px-1.5 py-0.5 bg-transparent border-none text-muted hover:text-primary cursor-pointer text-xs leading-none"
-              title="Clear search"
+              title="Очистить поиск"
             >
               ×
             </button>
@@ -125,10 +125,10 @@ export const EntitySearchBar: React.FC<Props> = ({
       {showDropdown && (
         <div
           ref={listRef}
-          className="absolute top-full right-0 mt-0.5 w-[320px] max-h-[280px] overflow-y-auto bg-elevated border border-subtle rounded-sm shadow-lg z-50"
+          className="absolute top-full right-0 mt-1 w-[330px] max-h-[280px] overflow-y-auto bg-elevated border border-subtle rounded-md shadow-[0_12px_32px_rgba(0,0,0,0.65)] z-50"
         >
           {results.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-muted italic">No results</div>
+            <div className="px-3 py-2 text-xs text-muted italic">Совпадений не найдено</div>
           ) : (
             results.map((result, i) => (
               <button

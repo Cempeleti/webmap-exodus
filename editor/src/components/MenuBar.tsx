@@ -63,7 +63,7 @@ const MenuDropdown: React.FC<{
         {label}
       </button>
       {isOpen && (
-        <div className="absolute top-full left-0 min-w-[160px] bg-elevated border border-subtle rounded-sm shadow-lg z-50 py-1">
+        <div className="absolute top-full left-0 min-w-[200px] bg-elevated border border-subtle rounded-md shadow-[0_12px_32px_rgba(0,0,0,0.65)] z-50 py-1">
           {items.map((item, i) => {
             if (item.separator) {
               return <div key={i} className="h-px bg-subtle mx-2 my-1" />;
@@ -76,18 +76,18 @@ const MenuDropdown: React.FC<{
                   item.action?.();
                   onClose();
                 }}
-                className={`flex w-full px-3 py-1.5 text-xs text-left items-center gap-2 border-none bg-transparent ${
+                className={`flex w-full px-3 py-1.5 text-xs text-left items-center gap-2 border-none bg-transparent transition-colors ${
                   item.disabled
-                    ? 'text-muted cursor-default hover:bg-transparent'
+                    ? 'text-muted opacity-50 cursor-default hover:bg-transparent'
                     : 'text-primary cursor-pointer hover:bg-hover'
                 }`}
               >
-                <span className="w-[18px] text-center text-[11px]">
+                <span className="w-[16px] text-center text-[11px] text-accent">
                   {item.checked !== undefined ? (item.checked ? '\u2713' : '') : ''}
                 </span>
                 <span className="flex-1">{item.label}</span>
                 {item.shortcut && (
-                  <span className="text-muted ml-4 text-[10px]">{item.shortcut}</span>
+                  <span className="text-muted font-mono ml-4 text-[10px]">{item.shortcut}</span>
                 )}
               </button>
             );
@@ -148,7 +148,7 @@ export const MenuBar: React.FC<Props> = ({
   };
 
   const handleNewMap = () => {
-    if (dirty && !window.confirm('Unsaved changes will be lost. Continue?')) return;
+    if (dirty && !window.confirm('Несохранённые изменения будут потеряны. Продолжить?')) return;
     onNewMap();
   };
 
@@ -156,52 +156,57 @@ export const MenuBar: React.FC<Props> = ({
   const closeMenu = useCallback(() => setOpenMenu(null), []);
 
   const fileItems: MenuItem[] = [
-    { label: 'New Shuttle / Map', shortcut: 'Ctrl+N', action: handleNewMap },
+    { label: 'Новый шаттл / карта', shortcut: 'Ctrl+N', action: handleNewMap },
     { label: 'separator', separator: true },
-    { label: 'Import .yml...', shortcut: 'Ctrl+O', action: handleImportClick },
-    { label: 'Export Shuttle (.yml Grid)', shortcut: 'Ctrl+S', action: onExportShuttle ?? onExport },
-    { label: 'Export Station (.yml Map)', action: onExportStation ?? onExport },
+    { label: 'Импорт .yml...', shortcut: 'Ctrl+O', action: handleImportClick },
+    { label: 'Экспорт шаттла (.yml Grid)', shortcut: 'Ctrl+S', action: onExportShuttle ?? onExport },
+    { label: 'Экспорт станции (.yml Map)', action: onExportStation ?? onExport },
     { label: 'separator', separator: true },
-    { label: 'Render Shuttle Image...', shortcut: 'Ctrl+R', action: onRenderShuttle },
+    { label: 'Рендер в галерею...', shortcut: 'Ctrl+R', action: onRenderShuttle },
   ];
 
   const editItems: MenuItem[] = [
-    { label: 'Undo', shortcut: 'Ctrl+Z', action: onUndo, disabled: !canUndo },
-    { label: 'Redo', shortcut: 'Ctrl+Y', action: onRedo, disabled: !canRedo },
+    { label: 'Отменить', shortcut: 'Ctrl+Z', action: onUndo, disabled: !canUndo },
+    { label: 'Повторить', shortcut: 'Ctrl+Y', action: onRedo, disabled: !canRedo },
   ];
 
   const viewItems: MenuItem[] = [
-    { label: 'Show Grid', action: onToggleGrid, checked: showGrid },
-    { label: 'Show Entities', action: onToggleEntities, checked: showEntities },
-    { label: 'Space Background', action: onToggleSpaceBackground, checked: showSpaceBackground },
-    { label: 'Lighting Preview', action: onToggleLighting, checked: showLighting },
+    { label: 'Сетка тайлов', action: onToggleGrid, checked: showGrid },
+    { label: 'Сущности', action: onToggleEntities, checked: showEntities },
+    { label: 'Фон космоса', action: onToggleSpaceBackground, checked: showSpaceBackground },
+    { label: 'Предпросмотр освещения', action: onToggleLighting, checked: showLighting },
     { label: 'separator', separator: true },
-    { label: 'Performance HUD', action: onTogglePerfHUD, checked: showPerfHUD },
-    { label: 'Benchmark Tool', action: onToggleBenchmark, checked: showBenchmark },
+    { label: 'Монитор FPS (HUD)', action: onTogglePerfHUD, checked: showPerfHUD },
+    { label: 'Бенчмарк', action: onToggleBenchmark, checked: showBenchmark },
     { label: 'separator', separator: true },
-    { label: 'Controls', shortcut: '?', action: onShowShortcuts },
+    { label: 'Горячие клавиши', shortcut: '?', action: onShowShortcuts },
   ];
 
   const menus: { name: string; items: MenuItem[] }[] = [
-    { name: 'File', items: fileItems },
-    { name: 'Edit', items: editItems },
-    { name: 'View', items: viewItems },
+    { name: 'Файл', items: fileItems },
+    { name: 'Правка', items: editItems },
+    { name: 'Вид', items: viewItems },
   ];
 
   return (
-    <div ref={barRef} className="flex items-center h-9 bg-surface border-b border-subtle px-2 gap-2">
+    <div ref={barRef} className="flex items-center h-10 bg-panel border-b border-subtle px-2.5 gap-1.5 select-none shrink-0">
       <a
         href="../"
-        className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted hover:text-white hover:bg-hover rounded transition-colors no-underline mr-1"
+        className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted hover:text-white bg-surface/80 hover:bg-hover border border-subtle rounded transition-colors no-underline mr-1"
         title="Вернуться в каталог Webmap"
       >
-        <span>⬅</span>
-        <span className="font-medium">Webmap</span>
+        <span className="text-accent">←</span>
+        <span className="font-medium">Каталог</span>
       </a>
 
-      <span className="text-[13px] font-bold text-accent mr-2">
-        SS14 Map Editor
+      <span
+        className="text-[13px] font-bold tracking-[0.06em] uppercase text-accent mr-1.5 hidden sm:inline"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        EXODUS MAPPER
       </span>
+
+      <div className="h-4 w-px bg-subtle mx-0.5 hidden sm:block" />
 
       {menus.map(menu => (
         <MenuDropdown
@@ -216,11 +221,38 @@ export const MenuBar: React.FC<Props> = ({
         />
       ))}
 
+      <div className="flex items-center gap-0.5 ml-1">
+        <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="Отменить (Ctrl+Z)"
+          className={`px-2 py-1 text-xs rounded border border-transparent transition-colors ${
+            canUndo
+              ? 'text-primary hover:bg-hover hover:border-subtle cursor-pointer bg-transparent'
+              : 'text-muted/40 cursor-default bg-transparent'
+          }`}
+        >
+          ↶
+        </button>
+        <button
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="Повторить (Ctrl+Y)"
+          className={`px-2 py-1 text-xs rounded border border-transparent transition-colors ${
+            canRedo
+              ? 'text-primary hover:bg-hover hover:border-subtle cursor-pointer bg-transparent'
+              : 'text-muted/40 cursor-default bg-transparent'
+          }`}
+        >
+          ↷
+        </button>
+      </div>
+
       {onRenderShuttle && (
         <button
           onClick={onRenderShuttle}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-[#00adb5]/20 hover:bg-[#00adb5]/30 text-[#00adb5] border border-[#00adb5]/40 rounded cursor-pointer transition-colors ml-1"
-          title="Сделать моментальный рендер шаттла"
+          className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-accent/15 hover:bg-accent/25 text-accent border border-accent/45 rounded cursor-pointer transition-all shadow-[0_0_14px_rgba(65,182,251,0.16)] ml-1.5"
+          title="Сделать рендер шаттла и опубликовать в галерею"
         >
           <span>🚀</span>
           <span>Рендер</span>
@@ -228,17 +260,17 @@ export const MenuBar: React.FC<Props> = ({
       )}
 
       {forkName && (
-        <div className="relative ml-1" ref={forkMenuRef}>
+        <div className="relative ml-1.5" ref={forkMenuRef}>
           <button
             onClick={() => setShowForkMenu(!showForkMenu)}
-            className="flex items-center gap-1.5 text-[11px] text-muted hover:text-primary cursor-pointer bg-transparent border border-subtle rounded-sm px-2 py-0.5"
-            title="Активный билд игры (нажмите для смены)"
+            className="flex items-center gap-1.5 text-[11px] text-muted hover:text-primary cursor-pointer bg-surface/90 border border-subtle rounded px-2.5 py-1 transition-colors"
+            title="Активный билд игры (нажмите для выбора папки)"
           >
-            <span className="text-[10px]">{'\uD83D\uDCC1'}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_6px_rgba(63,185,80,0.85)]" />
             <span className="font-mono text-accent">{forkName}</span>
           </button>
           {showForkMenu && (
-            <div className="absolute left-0 top-full mt-1 bg-elevated border border-subtle rounded shadow-lg z-50 py-1 min-w-[180px]">
+            <div className="absolute left-0 top-full mt-1 bg-elevated border border-subtle rounded-md shadow-[0_12px_32px_rgba(0,0,0,0.65)] z-50 py-1 min-w-[210px]">
               <a
                 href="https://github.com/SerbiaStrong-220/Monolith"
                 target="_blank"
@@ -251,7 +283,7 @@ export const MenuBar: React.FC<Props> = ({
                 onClick={() => { setShowForkMenu(false); onSwitchFork?.(); }}
                 className="w-full text-left px-3 py-1.5 text-[11px] text-primary hover:bg-hover cursor-pointer bg-transparent border-none border-t border-subtle"
               >
-                Сменить папку форка...
+                Указать локальную папку билда...
               </button>
             </div>
           )}
@@ -261,7 +293,10 @@ export const MenuBar: React.FC<Props> = ({
       <div className="flex-1" />
 
       {dirty && (
-        <span className="text-warning text-[10px]">Unsaved changes</span>
+        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-warning/15 border border-warning/35 text-warning text-[10px] font-mono">
+          <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+          Не сохранено
+        </span>
       )}
 
       <input
@@ -281,64 +316,65 @@ export const MenuBar: React.FC<Props> = ({
 
 const SHORTCUT_SECTIONS: { title: string; rows: [string, string][] }[] = [
   {
-    title: 'Tool Selection',
+    title: 'Инструменты',
     rows: [
-      ['B', 'Paint'],
-      ['E', 'Erase'],
-      ['I', 'Eyedropper'],
-      ['H', 'Pan'],
-      ['G', 'Fill'],
-      ['R', 'Rectangle'],
-      ['L', 'Line'],
-      ['C', 'Circle'],
-      ['S', 'Select (tiles + entities)'],
-      ['V', 'Entity Select'],
-      ['P', 'Entity Place'],
-      ['K', 'Cable Draw'],
-      ['J', 'Pipe Draw'],
-      ['D', 'Device Link'],
+      ['B', 'Кисть (тайлы)'],
+      ['E', 'Ластик'],
+      ['I', 'Пипетка'],
+      ['H', 'Рука (панорамирование)'],
+      ['G', 'Заливка'],
+      ['R', 'Прямоугольник'],
+      ['L', 'Линия'],
+      ['C', 'Круг'],
+      ['S', 'Выделение (тайлы + объекты)'],
+      ['V', 'Выбор сущностей'],
+      ['P', 'Размещение сущностей'],
+      ['K', 'Прокладка кабелей'],
+      ['J', 'Прокладка труб'],
+      ['D', 'Связывание устройств'],
     ],
   },
   {
-    title: 'General',
+    title: 'Общее',
     rows: [
-      ['Ctrl+Z', 'Undo'],
-      ['Ctrl+Y / Ctrl+Shift+Z', 'Redo'],
-      ['Ctrl+N', 'New Map'],
-      ['Ctrl+O', 'Import .yml'],
-      ['Ctrl+S', 'Export .yml'],
-      ['Ctrl+F', 'Search entities on map'],
-      ['Space (hold)', 'Pan mode'],
-      ['Escape', 'Cancel / close menu'],
-      ['?', 'This dialog'],
+      ['Ctrl+Z', 'Отменить'],
+      ['Ctrl+Y / Ctrl+Shift+Z', 'Повторить'],
+      ['Ctrl+N', 'Новая карта / шаттл'],
+      ['Ctrl+O', 'Импорт .yml'],
+      ['Ctrl+S', 'Экспорт .yml'],
+      ['Ctrl+R', 'Рендер шаттла'],
+      ['Ctrl+F', 'Поиск сущностей на карте'],
+      ['Space (удерж.)', 'Панорамирование'],
+      ['Escape', 'Снять выделение / закрыть окно'],
+      ['?', 'Эта справка'],
     ],
   },
   {
-    title: 'Clipboard (Select Tool)',
+    title: 'Буфер обмена (Выделение)',
     rows: [
-      ['Ctrl+C', 'Copy'],
-      ['Ctrl+X', 'Cut'],
-      ['Ctrl+V', 'Paste'],
-      ['Delete / Backspace', 'Delete selection'],
+      ['Ctrl+C', 'Копировать'],
+      ['Ctrl+X', 'Вырезать'],
+      ['Ctrl+V', 'Вставить'],
+      ['Delete / Backspace', 'Удалить выделенное'],
     ],
   },
   {
-    title: 'Entity Rotation',
+    title: 'Поворот объектов',
     rows: [
-      ['R', 'Rotate CW (90\u00b0)'],
-      ['Shift+R', 'Rotate CCW (90\u00b0)'],
+      ['R', 'По часовой (90\u00b0)'],
+      ['Shift+R', 'Против часовой (90\u00b0)'],
     ],
   },
   {
-    title: 'Mouse',
+    title: 'Мышь',
     rows: [
-      ['Scroll', 'Zoom in / out'],
-      ['Middle drag', 'Pan'],
-      ['Click + drag', 'Use active tool'],
-      ['Shift + click', 'Free placement / toggle select'],
-      ['Shift + drag', 'Free-move entity (fractional)'],
-      ['Right click', 'Deselect / context menu / erase'],
-      ['Scroll on entity stack', 'Cycle overlapping entities'],
+      ['Колёсико', 'Масштаб'],
+      ['СКМ + тянуть', 'Панорамирование'],
+      ['ЛКМ + тянуть', 'Применить инструмент'],
+      ['Shift + клик', 'Свободное размещение / мультивыбор'],
+      ['Shift + тянуть', 'Точный сдвиг сущности (дробные коорд.)'],
+      ['ПКМ', 'Снять выделение / контекстное меню / стереть'],
+      ['Колёсико на стопке', 'Перебор перекрытых сущностей'],
     ],
   },
 ];
@@ -355,13 +391,13 @@ const ShortcutsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+      className="fixed inset-0 z-[9998] flex items-center justify-center backdrop-blur-sm"
+      style={{ backgroundColor: 'rgba(5,8,16,0.78)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-elevated border border-subtle rounded-lg p-6 max-w-[560px] w-full max-h-[80vh] overflow-y-auto text-primary text-[13px]">
+      <div className="bg-elevated border border-subtle rounded-lg p-6 max-w-[560px] w-full max-h-[80vh] overflow-y-auto text-primary text-[13px] shadow-[0_18px_48px_rgba(0,0,0,0.7)]">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-accent m-0">Controls</h2>
+          <h2 className="text-base font-semibold text-accent m-0 uppercase tracking-wider" style={{ fontFamily: 'var(--font-display)' }}>Управление</h2>
           <button
             onClick={onClose}
             className="bg-transparent border-none text-muted hover:text-primary cursor-pointer text-lg leading-none px-1"
@@ -372,10 +408,10 @@ const ShortcutsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
         {SHORTCUT_SECTIONS.map((section) => (
           <div key={section.title} className="mb-4">
-            <h3 className="text-[11px] uppercase tracking-wider text-muted mb-1.5 font-semibold">
+            <h3 className="text-[11px] font-mono uppercase tracking-wider text-muted mb-1.5 font-semibold">
               {section.title}
             </h3>
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
               {section.rows.map(([key, desc]) => (
                 <React.Fragment key={key + desc}>
                   <kbd className="text-accent font-mono text-[12px] text-right whitespace-nowrap">{key}</kbd>
@@ -389,9 +425,9 @@ const ShortcutsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <div className="text-center mt-4">
           <button
             onClick={onClose}
-            className="bg-active border border-subtle rounded text-primary text-[13px] px-6 py-2 cursor-pointer hover:bg-hover"
+            className="bg-active border border-subtle rounded text-primary text-[13px] px-6 py-2 cursor-pointer hover:bg-hover transition-colors"
           >
-            Close
+            Закрыть
           </button>
         </div>
       </div>

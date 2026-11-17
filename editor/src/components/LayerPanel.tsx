@@ -11,13 +11,13 @@ interface Props {
 }
 
 const LAYER_DEFS: { key: keyof LayerVisibility; label: string; desc: string }[] = [
-  { key: 'subfloor', label: 'SubFloor', desc: 'Cables, pipes, disposal (-22 to -13)' },
-  { key: 'floorObjects', label: 'Floor Obj', desc: 'Carpets, floor items (-12 to -5)' },
-  { key: 'structures', label: 'Structures', desc: 'Walls, windows, grilles (-2 to -1)' },
-  { key: 'objects', label: 'Objects', desc: 'Furniture, machines, wall mounts (0 to +7)' },
-  { key: 'doors', label: 'Doors', desc: 'Airlocks, firelocks, blast doors (+8 to +10)' },
-  { key: 'markers', label: 'Markers', desc: 'Spawn points, mapping helpers' },
-  { key: 'decals', label: 'Decals', desc: 'Floor markings, arrows, overlays' },
+  { key: 'subfloor', label: 'Подпол (SubFloor)', desc: 'Кабели, трубы, пневмопочта (-22.. -13)' },
+  { key: 'floorObjects', label: 'Напольные', desc: 'Ковры, напольные предметы (-12.. -5)' },
+  { key: 'structures', label: 'Конструкции', desc: 'Стены, окна, решётки (-2.. -1)' },
+  { key: 'objects', label: 'Объекты', desc: 'Мебель, станки, настенное (0.. +7)' },
+  { key: 'doors', label: 'Шлюзы и двери', desc: 'Шлюзы, фаерлоки, бласт-двери (+8.. +10)' },
+  { key: 'markers', label: 'Маркеры', desc: 'Точки спавна, вспомогательные маркеры' },
+  { key: 'decals', label: 'Декали', desc: 'Разметка пола, стрелки, потёртости' },
 ];
 
 export const LayerPanel: React.FC<Props> = ({
@@ -25,14 +25,14 @@ export const LayerPanel: React.FC<Props> = ({
   showConnections, onToggleConnections,
 }) => {
   return (
-    <div className="p-3">
+    <div className="px-3 py-2">
       {LAYER_DEFS.map(def => (
-        <label key={def.key} className="flex items-center gap-2 py-0.5 text-primary text-[11px] cursor-pointer select-none" title={def.desc}>
+        <label key={def.key} className="flex items-center gap-2 py-0.5 text-primary text-[11px] cursor-pointer select-none hover:text-white transition-colors" title={def.desc}>
           <input
             type="checkbox"
             checked={layers[def.key]}
             onChange={() => onToggleLayer(def.key)}
-            className="accent-accent w-3 h-3"
+            className="accent-accent w-3.5 h-3.5"
           />
           {def.label}
         </label>
@@ -40,24 +40,24 @@ export const LayerPanel: React.FC<Props> = ({
 
       <div className="h-px bg-subtle my-2" />
 
-      <label className="flex items-center gap-2 py-0.5 text-primary text-[11px] cursor-pointer select-none" title="Show infrastructure under non-subfloor tiles (T-ray mode)">
+      <label className="flex items-center gap-2 py-0.5 text-primary text-[11px] cursor-pointer select-none hover:text-white transition-colors" title="Показывать скрытую инфраструктуру под плиткой (режим T-Ray)">
         <input
           type="checkbox"
           checked={showSubFloor}
           onChange={onToggleSubFloor}
-          className="accent-accent w-3 h-3"
+          className="accent-accent w-3.5 h-3.5"
         />
-        T-Ray (SubFloor)
+        T-Ray (под полом)
       </label>
 
-      <label className="flex items-center gap-2 py-0.5 text-primary text-[11px] cursor-pointer select-none" title="Show device links and connections">
+      <label className="flex items-center gap-2 py-0.5 text-primary text-[11px] cursor-pointer select-none hover:text-white transition-colors" title="Показывать логические связи устройств">
         <input
           type="checkbox"
           checked={showConnections}
           onChange={onToggleConnections}
-          className="accent-accent w-3 h-3"
+          className="accent-accent w-3.5 h-3.5"
         />
-        Connections
+        Связи устройств
       </label>
     </div>
   );

@@ -34,76 +34,78 @@ interface ToolDef {
 }
 
 const TILE_TOOLS: ToolDef[] = [
-  { id: 'pan', label: 'Pan', shortcut: 'H', icon: faHandPaper },
-  { id: 'paint', label: 'Paint', shortcut: 'B', icon: faPaintBrush },
-  { id: 'erase', label: 'Erase', shortcut: 'E', icon: faEraser },
-  { id: 'eyedropper', label: 'Pick', shortcut: 'I', icon: faEyeDropper },
-  { id: 'fill', label: 'Fill', shortcut: 'G', icon: faFillDrip },
-  { id: 'rectangle', label: 'Rect', shortcut: 'R', icon: faSquare },
-  { id: 'line', label: 'Line', shortcut: 'L', icon: faGripLines },
-  { id: 'circle', label: 'Circle', shortcut: 'C', icon: faCircle },
-  { id: 'select', label: 'Select', shortcut: 'S', icon: faObjectGroup },
+  { id: 'pan', label: 'Рука', shortcut: 'H', icon: faHandPaper },
+  { id: 'paint', label: 'Кисть', shortcut: 'B', icon: faPaintBrush },
+  { id: 'erase', label: 'Ластик', shortcut: 'E', icon: faEraser },
+  { id: 'eyedropper', label: 'Пипетка', shortcut: 'I', icon: faEyeDropper },
+  { id: 'fill', label: 'Заливка', shortcut: 'G', icon: faFillDrip },
+  { id: 'rectangle', label: 'Прямоуг.', shortcut: 'R', icon: faSquare },
+  { id: 'line', label: 'Линия', shortcut: 'L', icon: faGripLines },
+  { id: 'circle', label: 'Круг', shortcut: 'C', icon: faCircle },
+  { id: 'select', label: 'Выдел.', shortcut: 'S', icon: faObjectGroup },
 ];
 
 const ENTITY_TOOLS: ToolDef[] = [
-  { id: 'entitySelect', label: 'E-Select', shortcut: 'V', icon: faMousePointer },
-  { id: 'entityPlace', label: 'E-Place', shortcut: 'P', icon: faCube },
-  { id: 'deviceLink', label: 'Link', shortcut: 'D', icon: faLink },
+  { id: 'entitySelect', label: 'Выбор', shortcut: 'V', icon: faMousePointer },
+  { id: 'entityPlace', label: 'Ставить', shortcut: 'P', icon: faCube },
+  { id: 'deviceLink', label: 'Связи', shortcut: 'D', icon: faLink },
 ];
 
 const INFRA_TOOLS: ToolDef[] = [
-  { id: 'cableDraw', label: 'Cables', shortcut: 'K', icon: faBolt },
-  { id: 'pipeDraw', label: 'Pipes', shortcut: 'J', icon: faWater },
+  { id: 'cableDraw', label: 'Кабели', shortcut: 'K', icon: faBolt },
+  { id: 'pipeDraw', label: 'Трубы', shortcut: 'J', icon: faWater },
 ];
 
 function ToolButton({ tool, active, onSelect }: { tool: ToolDef; active: boolean; onSelect: (tool: ToolType) => void }) {
   return (
     <button
       onClick={() => onSelect(tool.id)}
-      className={`flex flex-col items-center justify-center w-full py-2 text-[10px] cursor-pointer border-none gap-0.5
-                  ${active ? 'bg-active text-accent' : 'bg-transparent text-muted hover:bg-hover hover:text-primary'}`}
+      className={`relative flex flex-col items-center justify-center w-full py-1.5 text-[10px] cursor-pointer border-none border-l-2 gap-0.5 transition-all
+                  ${active
+                    ? 'bg-active text-accent border-l-accent shadow-[inset_0_0_12px_rgba(65,182,251,0.14)] font-medium'
+                    : 'bg-transparent text-muted border-l-transparent hover:bg-hover hover:text-primary'}`}
       title={`${tool.label} (${tool.shortcut})`}
     >
-      <FontAwesomeIcon icon={tool.icon} className="text-sm" />
-      <span className="leading-tight">{tool.label}</span>
-      <span className="text-[8px] text-muted opacity-60">{tool.shortcut}</span>
+      <FontAwesomeIcon icon={tool.icon} className="text-[13px]" />
+      <span className="leading-tight tracking-tight">{tool.label}</span>
+      <span className="text-[8px] font-mono text-muted opacity-60">{tool.shortcut}</span>
     </button>
   );
 }
 
 export const Toolbar: React.FC<Props> = ({ activeTool, onSelectTool }) => {
   return (
-    <div className="flex flex-col w-[76px] bg-panel border-r border-subtle py-1 overflow-y-auto">
-      <div className="text-[9px] text-muted uppercase text-center tracking-wider py-0.5">Tiles</div>
+    <div className="flex flex-col w-[74px] bg-panel border-r border-subtle py-1.5 overflow-y-auto shrink-0 select-none">
+      <div className="text-[9px] font-mono text-muted/80 uppercase text-center tracking-[0.14em] py-0.5">Тайлы</div>
       {TILE_TOOLS.map(tool => (
         <ToolButton key={tool.id} tool={tool} active={activeTool === tool.id} onSelect={onSelectTool} />
       ))}
 
-      <div className="h-px bg-subtle mx-2 my-1" />
-      <div className="text-[9px] text-muted uppercase text-center tracking-wider py-0.5">Entities</div>
+      <div className="h-px bg-subtle mx-2 my-1.5" />
+      <div className="text-[9px] font-mono text-muted/80 uppercase text-center tracking-[0.14em] py-0.5">Объекты</div>
       {ENTITY_TOOLS.map(tool => (
         <ToolButton key={tool.id} tool={tool} active={activeTool === tool.id} onSelect={onSelectTool} />
       ))}
 
-      <div className="h-px bg-subtle mx-2 my-1" />
-      <div className="text-[9px] text-muted uppercase text-center tracking-wider py-0.5">Infra</div>
+      <div className="h-px bg-subtle mx-2 my-1.5" />
+      <div className="text-[9px] font-mono text-muted/80 uppercase text-center tracking-[0.14em] py-0.5">Инфра</div>
       {INFRA_TOOLS.map(tool => (
         <ToolButton key={tool.id} tool={tool} active={activeTool === tool.id} onSelect={onSelectTool} />
       ))}
 
-      <div className="text-[8px] text-muted text-center mt-2 leading-tight opacity-60">
-        Space+Drag<br />to pan
+      <div className="text-[8px] font-mono text-muted text-center mt-2 leading-tight opacity-65 px-1">
+        Space+ЛКМ<br />двигать
       </div>
 
-      <div className="mt-auto pb-2">
+      <div className="mt-auto pb-2 pt-2">
         <RepositoryLink variant="toolbar" label="GitHub" />
         <button
           onClick={() => triggerSpaceClown(window.innerWidth, window.innerHeight)}
-          className="flex flex-col items-center justify-center w-full py-2 text-[10px] cursor-pointer border-none bg-transparent text-muted hover:bg-hover hover:text-primary gap-0.5"
-          title="Honk!"
+          className="flex flex-col items-center justify-center w-full py-2 text-[10px] cursor-pointer border-none bg-transparent text-muted hover:bg-hover hover:text-primary gap-0.5 transition-colors"
+          title="Хонк!"
         >
           <img src="/images/clown.png" alt="🤡" style={{ width: 20, height: 20, imageRendering: 'pixelated' }} />
-          <span className="leading-tight">Clown?</span>
+          <span className="leading-tight">Хонк?</span>
         </button>
       </div>
     </div>

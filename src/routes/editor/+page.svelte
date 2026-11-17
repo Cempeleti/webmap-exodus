@@ -33,11 +33,12 @@
 <style>
 	.editor-container {
 		width: 100%;
-		height: calc(100vh - 58px);
-		min-height: 600px;
+		height: calc(100dvh - 60px);
+		min-height: 540px;
 		display: flex;
 		flex-direction: column;
-		background: #080c16;
+		background: #050810;
+		border-top: 1px solid rgba(65, 182, 251, 0.14);
 		overflow: hidden;
 	}
 
@@ -46,6 +47,6 @@
 		height: 100%;
 		border: none;
 		outline: none;
-		background: #080c16;
+		background: #050810;
 	}
 </style>

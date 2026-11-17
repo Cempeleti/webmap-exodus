@@ -1,6 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { IPrototypeRegistry } from '../loaders/registryTypes';
-import { getEntitySprite } from '../rendering/entityRenderer';
+import type { SpriteDrawInfo } from '../loaders/rsiLoader';
+import {
+  getEntitySprite,
+  getExtraLayers,
+  getSpriteColor,
+  getTintedSprite,
+} from '../rendering/entityRenderer';
 
 const THUMB_SIZE = 24;
 const PREVIEW_SIZE = 128;
@@ -10,41 +16,89 @@ const thumbnailCache = new Map<string, string | null>();
 // Track which prototypes are currently being polled for async sprite loading
 const pendingSet = new Set<string>();
 
+function drawThumbnailLayer(
+  ctx: CanvasRenderingContext2D,
+  sprite: SpriteDrawInfo,
+  size: number,
+  color?: string | null,
+): void {
+  const hasAlpha = Boolean(color && color.length === 9);
+  if (hasAlpha) {
+    ctx.save();
+    ctx.globalAlpha *= parseInt(color!.slice(7, 9), 16) / 255;
+  }
+
+  const tinted = color ? getTintedSprite(sprite, color) : null;
+  if (tinted) {
+    ctx.drawImage(tinted, 0, 0, size, size);
+  } else {
+    ctx.drawImage(
+      sprite.image,
+      sprite.sx, sprite.sy, sprite.sw, sprite.sh,
+      0, 0, size, size,
+    );
+  }
+
+  if (hasAlpha) {
+    ctx.restore();
+  }
+}
+
+/**
+ * Render all visible layers of a prototype sprite into a square dataURL.
+ * Returns the dataURL, null (no sprite), or undefined (still loading).
+ */
+function renderSpriteDataUrl(
+  prototypeId: string,
+  registry: IPrototypeRegistry,
+  size: number,
+  cacheKey: string,
+  allowPartial = false,
+): string | null | undefined {
+  if (thumbnailCache.has(cacheKey)) return thumbnailCache.get(cacheKey)!;
+
+  const sprite = getEntitySprite(prototypeId, 'south', registry);
+  if (sprite === null) {
+    thumbnailCache.set(cacheKey, null);
+    return null;
+  }
+  const extraLayers = getExtraLayers(prototypeId, 'south', registry);
+  if (sprite === undefined || (!allowPartial && extraLayers === undefined)) {
+    return undefined;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    thumbnailCache.set(cacheKey, null);
+    return null;
+  }
+  ctx.imageSmoothingEnabled = false;
+
+  const baseColor = getSpriteColor(prototypeId, registry);
+  drawThumbnailLayer(ctx, sprite, size, baseColor);
+
+  if (extraLayers) {
+    for (const layer of extraLayers) {
+      drawThumbnailLayer(ctx, layer, size, layer.color);
+    }
+  }
+
+  const dataUrl = canvas.toDataURL();
+  if (extraLayers !== undefined) {
+    thumbnailCache.set(cacheKey, dataUrl);
+  }
+  return dataUrl;
+}
+
 /**
  * Try to generate a thumbnail dataURL for a prototype.
  * Returns the dataURL, null (no sprite), or undefined (still loading).
  */
 function getThumbnail(prototypeId: string, registry: IPrototypeRegistry): string | null | undefined {
-  if (thumbnailCache.has(prototypeId)) return thumbnailCache.get(prototypeId)!;
-
-  const sprite = getEntitySprite(prototypeId, 'south', registry);
-  if (sprite === null) {
-    thumbnailCache.set(prototypeId, null);
-    return null;
-  }
-  if (sprite === undefined) {
-    // Still loading, will be available on next call
-    return undefined;
-  }
-
-  // Sprite loaded, render to offscreen canvas
-  const canvas = document.createElement('canvas');
-  canvas.width = THUMB_SIZE;
-  canvas.height = THUMB_SIZE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    thumbnailCache.set(prototypeId, null);
-    return null;
-  }
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(
-    sprite.image,
-    sprite.sx, sprite.sy, sprite.sw, sprite.sh,
-    0, 0, THUMB_SIZE, THUMB_SIZE,
-  );
-  const dataUrl = canvas.toDataURL();
-  thumbnailCache.set(prototypeId, dataUrl);
-  return dataUrl;
+  return renderSpriteDataUrl(prototypeId, registry, THUMB_SIZE, prototypeId);
 }
 
 /**
@@ -52,26 +106,7 @@ function getThumbnail(prototypeId: string, registry: IPrototypeRegistry): string
  * Uses a separate cache key suffix.
  */
 function getPreview(prototypeId: string, registry: IPrototypeRegistry): string | null {
-  const cacheKey = `${prototypeId}:preview`;
-  if (thumbnailCache.has(cacheKey)) return thumbnailCache.get(cacheKey)!;
-
-  const sprite = getEntitySprite(prototypeId, 'south', registry);
-  if (!sprite) return null;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = PREVIEW_SIZE;
-  canvas.height = PREVIEW_SIZE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(
-    sprite.image,
-    sprite.sx, sprite.sy, sprite.sw, sprite.sh,
-    0, 0, PREVIEW_SIZE, PREVIEW_SIZE,
-  );
-  const dataUrl = canvas.toDataURL();
-  thumbnailCache.set(cacheKey, dataUrl);
-  return dataUrl;
+  return renderSpriteDataUrl(prototypeId, registry, PREVIEW_SIZE, `${prototypeId}:preview`, true) ?? null;
 }
 
 interface EntityThumbnailProps {
@@ -140,6 +175,8 @@ export const EntityThumbnail: React.FC<EntityThumbnailProps> = ({ prototypeId, r
     return () => { cancelled = true; pendingSet.delete(prototypeId); };
   }, [visible, prototypeId, registry]);
 
+  const isResolvedNull = thumbnailCache.get(prototypeId) === null;
+
   return (
     <div ref={ref} className="w-6 h-6 shrink-0 flex items-center justify-center">
       {thumbUrl ? (
@@ -150,8 +187,15 @@ export const EntityThumbnail: React.FC<EntityThumbnailProps> = ({ prototypeId, r
           style={{ imageRendering: 'pixelated' }}
           draggable={false}
         />
+      ) : isResolvedNull ? (
+        <div
+          className="w-5 h-5 rounded border border-subtle bg-surface flex items-center justify-center text-[9px] font-mono text-muted"
+          title="Без видимого спрайта"
+        >
+          ◇
+        </div>
       ) : (
-        <div className="w-5 h-5 bg-surface rounded-sm" />
+        <div className="w-5 h-5 bg-surface rounded-sm animate-pulse" />
       )}
     </div>
   );
@@ -179,7 +223,7 @@ export const SpritePreviewPopup: React.FC<SpritePreviewPopupProps> = ({
 
   return (
     <div
-      className="fixed z-[200] bg-elevated border border-subtle rounded shadow-lg p-2 pointer-events-none"
+      className="fixed z-[200] bg-elevated border border-subtle rounded-lg shadow-[0_8px_28px_rgba(0,0,0,0.65)] p-2.5 pointer-events-none"
       style={{ left, top }}
     >
       {previewUrl ? (
@@ -196,7 +240,7 @@ export const SpritePreviewPopup: React.FC<SpritePreviewPopupProps> = ({
           className="bg-surface rounded flex items-center justify-center text-muted text-xs"
           style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
         >
-          No sprite
+          Нет спрайта
         </div>
       )}
       <div className="text-primary text-[11px] text-center mt-1 truncate" style={{ maxWidth: PREVIEW_SIZE }}>

@@ -223,10 +223,15 @@ export async function loadSprite(
     state = meta.states.get('space_artillery') ||
             meta.states.get('icon') ||
             meta.states.get('base') ||
+            meta.states.get('full') ||
+            meta.states.get('closed') ||
+            meta.states.get('off') ||
             meta.states.get('default') ||
             meta.states.get('0') ||
             meta.states.get('state0') ||
-            meta.states.get('idle');
+            meta.states.get('idle') ||
+            meta.states.get('empty') ||
+            meta.states.get('lit');
   }
 
   // 5. Fallback: partial / prefix match

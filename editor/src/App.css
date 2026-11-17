@@ -1,18 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-panel: #0d1b2a;
-  --color-surface: #16213e;
-  --color-elevated: #1a1a3e;
-  --color-subtle: #2a2a4a;
-  --color-primary: #e0e0e0;
-  --color-muted: #888888;
-  --color-accent: #4488ff;
-  --color-active: #0f3460;
-  --color-hover: #1a2a4e;
-  --color-danger: #cc4444;
-  --color-success: #88ff88;
-  --color-warning: #ff8800;
+  --color-panel: #050810;
+  --color-surface: #080d1a;
+  --color-elevated: #0c1428;
+  --color-subtle: rgba(65, 182, 251, 0.2);
+  --color-primary: #e6edf3;
+  --color-muted: #7d91b0;
+  --color-accent: #41b6fb;
+  --color-active: rgba(65, 182, 251, 0.16);
+  --color-hover: #111c33;
+  --color-danger: #ef4444;
+  --color-success: #3fb950;
+  --color-warning: #f0a500;
+  --font-sans: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Rajdhani', 'Exo 2', sans-serif;
+  --font-mono: 'Share Tech Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {
@@ -20,10 +23,29 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(65, 182, 251, 0.28) #050810;
   }
   html, body, #root {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    background-color: #050810;
+    color: #e6edf3;
+    font-family: var(--font-sans);
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #050810;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(65, 182, 251, 0.28);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(65, 182, 251, 0.5);
   }
 }

@@ -911,10 +911,10 @@ export const App: React.FC = () => {
             />
           </div>
         </div>
-        <div className="flex flex-col min-w-[280px] max-w-[400px] w-[20vw] bg-panel border-l border-subtle overflow-hidden">
+        <div className="flex flex-col min-w-[290px] max-w-[400px] w-[20vw] bg-panel border-l border-subtle overflow-hidden">
           {/* Contextual panels at top */}
           {selectedEntities.length > 0 && (
-            <CollapsiblePanel title="Entity Info" forceOpen={selectedEntities.length > 0}>
+            <CollapsiblePanel title="Свойства сущности" forceOpen={selectedEntities.length > 0}>
               <EntityInfoPanel
                 entities={selectedEntities}
                 allEntities={state.entities}
@@ -939,7 +939,7 @@ export const App: React.FC = () => {
             </CollapsiblePanel>
           )}
           {state.selectedDecalIds.length > 0 && state.selectedEntityUids.length === 0 && (
-            <CollapsiblePanel title="Decal Info" forceOpen={state.selectedDecalIds.length > 0}>
+            <CollapsiblePanel title="Свойства декали" forceOpen={state.selectedDecalIds.length > 0}>
               <DecalInfoPanel
                 selectedDecalIds={state.selectedDecalIds}
                 decals={state.grids[state.activeGridIndex]?.decals?.decals ?? []}
@@ -949,7 +949,7 @@ export const App: React.FC = () => {
             </CollapsiblePanel>
           )}
           {(state.activeTool === 'cableDraw' || state.activeTool === 'pipeDraw') && (
-            <CollapsiblePanel title="Infrastructure" defaultOpen={true}>
+            <CollapsiblePanel title="Инфраструктура" defaultOpen={true}>
               <InfrastructurePanel
                 selection={infraSelection}
                 onChange={handleInfraChange}
@@ -965,7 +965,7 @@ export const App: React.FC = () => {
             decalPlacementSettingsRef={decalPlacementSettingsRef}
           />
           {/* Layer panel at bottom */}
-          <CollapsiblePanel title="Layers" defaultOpen={true}>
+          <CollapsiblePanel title="Слои отображения" defaultOpen={true}>
             <LayerPanel
               layers={layerVisibility}
               onToggleLayer={handleToggleLayer}

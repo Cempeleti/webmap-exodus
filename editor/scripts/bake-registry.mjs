@@ -152,7 +152,17 @@ function parseSpriteOffset(value) {
 
 function extractSpriteInfo(components) {
   const spriteComp = components.find(c => c.type === 'Sprite');
-  if (!spriteComp) return null;
+  const iconComp = components.find(c => c.type === 'Icon');
+  if (!spriteComp) {
+    if (iconComp && (iconComp.sprite || iconComp.state)) {
+      return {
+        rsiPath: iconComp.sprite ? normalizeRsiPath(iconComp.sprite) : '',
+        baseState: iconComp.state ?? '',
+        layers: [],
+      };
+    }
+    return null;
+  }
 
   const rawLayers = spriteComp.layers ?? [];
   const layers = rawLayers.map(l => ({
@@ -165,14 +175,26 @@ function extractSpriteInfo(components) {
     scale: l.scale,
   }));
 
-  const iconSmoothComp = components.find(c => c.type === 'IconSmooth');
+  const topLevelSprite = spriteComp.sprite ? normalizeRsiPath(spriteComp.sprite) : undefined;
+  const visibleLayers = layers.filter(l => l.visible !== false);
+  const anyLayerReliesOnTopLevel = layers.length > 0 && layers.some(l => !l.sprite);
+  let rsiPath;
 
-  // RSI path: top-level sprite or fallback to first visible layer's sprite
-  let rsiPath = spriteComp.sprite ? normalizeRsiPath(spriteComp.sprite) : '';
-  if (!rsiPath && layers.length > 0) {
-    for (const l of layers) {
-      if (l.sprite && l.visible !== false) {
-        rsiPath = l.sprite;
+  if (layers.length > 0 && !anyLayerReliesOnTopLevel) {
+    for (const layer of visibleLayers) {
+      if (layer.sprite) {
+        rsiPath = layer.sprite;
+        break;
+      }
+    }
+  }
+  if (!rsiPath) {
+    rsiPath = topLevelSprite;
+  }
+  if (!rsiPath) {
+    for (const layer of visibleLayers) {
+      if (layer.sprite) {
+        rsiPath = layer.sprite;
         break;
       }
     }
@@ -180,18 +202,39 @@ function extractSpriteInfo(components) {
       rsiPath = layers[0].sprite;
     }
   }
+  if (!rsiPath && iconComp?.sprite) {
+    rsiPath = normalizeRsiPath(iconComp.sprite);
+  }
+  if (!rsiPath) return null;
 
-  // baseState: prefer direct state, or first visible layer's state
-  let baseState = spriteComp.state ?? '';
-  if (!baseState && layers.length > 0) {
-    for (const l of layers) {
-      if (l.state && l.visible !== false) {
-        baseState = l.state;
-        break;
-      }
-    }
-    if (!baseState && layers[0]?.state) {
-      baseState = layers[0].state;
+  const directState = spriteComp.state ?? '';
+  let baseState = visibleLayers.length > 0 ? '' : directState;
+  for (const layer of visibleLayers) {
+    if (!layer.state) continue;
+    if (layer.sprite && layer.sprite !== rsiPath) continue;
+    baseState = layer.state;
+    break;
+  }
+  if (!baseState && visibleLayers[0]?.state) {
+    baseState = visibleLayers[0].state;
+  }
+  if (!baseState && directState && layers.length > 0) {
+    baseState = directState;
+  }
+
+  const storageVisuals = components.find(c => c.type === 'EntityStorageVisuals');
+  if (storageVisuals?.stateBaseClosed) {
+    baseState = storageVisuals.stateBaseClosed;
+  }
+
+  const iconSmoothComp = components.find(c => c.type === 'IconSmooth');
+  if (!baseState && iconSmoothComp) {
+    baseState = iconComp?.state || 'full';
+  }
+  if (!baseState && iconComp) {
+    baseState = iconComp.state ?? '';
+    if (iconComp.sprite && layers.length > 0 && visibleLayers.length === 0) {
+      rsiPath = normalizeRsiPath(iconComp.sprite);
     }
   }
 
@@ -199,7 +242,7 @@ function extractSpriteInfo(components) {
     rsiPath,
     baseState,
     drawDepth: spriteComp.drawdepth ?? spriteComp.drawDepth,
-    noRot: spriteComp.noRot,
+    noRot: spriteComp.noRot === true || spriteComp.norot === true ? true : undefined,
     offset: parseSpriteOffset(spriteComp.offset),
     scale: parseSpriteOffset(spriteComp.scale),
     color: spriteComp.color,
@@ -397,7 +440,7 @@ const decalsMap = resolveDecals(rawDecals);
 
 // Filter components to reduce size while retaining everything the editor needs
 const RELEVANT_COMPS = new Set([
-  'Sprite', 'IconSmooth', 'Occluder', 'DeviceList', 'DeviceLinkSource', 'DeviceLinkSink',
+  'Sprite', 'Icon', 'IconSmooth', 'EntityStorageVisuals', 'Occluder', 'DeviceList', 'DeviceLinkSource', 'DeviceLinkSink',
   'ContainerContainer', 'EntityTableContainerFill', 'Battery', 'AtmosPipeColor',
   'SurveillanceCamera', 'MetaData', 'Physics', 'Fixtures', 'Shuttle'
 ]);
