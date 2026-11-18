@@ -106,6 +106,10 @@ export const App: React.FC = () => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>({ ...DEFAULT_LAYER_VISIBILITY });
   const [pendingDeleteGridUid, setPendingDeleteGridUid] = useState<number | null>(null);
+  const isBatchMode = useMemo(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('batch') === '1',
+    [],
+  );
   const [validatorIssues, setValidatorIssues] = useState<ValidationIssue[] | null>(null);
   const [highlightTile, setHighlightTile] = useState<{ x: number; y: number; startTime: number } | null>(null);
   const [infraSelection, setInfraSelection] = useState<InfrastructureSelection>({
@@ -228,6 +232,106 @@ export const App: React.FC = () => {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [state.dirty]);
+
+  // Headless batch-renderer RPC bridge for Admin Panel (/admin?...)
+  useEffect(() => {
+    if (!isBatchMode || !state.registry || !forkProvider) return;
+
+    const notifyReady = () => {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: 'WEBMAP_BATCH_READY',
+            entityCount: state.registry?.entityCount ?? 0,
+            tileCount: state.registry?.tileCount ?? 0,
+          },
+          window.location.origin,
+        );
+      }
+    };
+
+    let renderQueue = Promise.resolve();
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const msg = event.data;
+      if (!msg || typeof msg !== 'object') return;
+
+      if (msg.type === 'WEBMAP_BATCH_PING') {
+        notifyReady();
+        return;
+      }
+
+      if (msg.type === 'WEBMAP_RENDER_YAML') {
+        const jobId = String(msg.jobId || '');
+        const yamlText = typeof msg.yamlText === 'string' ? msg.yamlText : '';
+        const backgroundColor = msg.backgroundColor === undefined ? null : msg.backgroundColor;
+        const maxDimension = typeof msg.maxDimension === 'number' ? msg.maxDimension : 2048;
+
+        renderQueue = renderQueue.then(async () => {
+          try {
+            if (!yamlText.trim()) throw new Error('Пустой YAML карты');
+            const parsed = importMap(yamlText);
+            const primaryGrid =
+              parsed.gridDataList && parsed.gridDataList.length > 0
+                ? parsed.gridDataList.reduce((best, cur) => {
+                    const bestScore = best.entities.length + best.grid.width * best.grid.height;
+                    const curScore = cur.entities.length + cur.grid.width * cur.grid.height;
+                    return curScore > bestScore ? cur : best;
+                  })
+                : null;
+
+            const grid = primaryGrid?.grid ?? parsed.grid;
+            const entities = primaryGrid?.entities ?? parsed.entities;
+            const decals = primaryGrid?.decals?.decals ?? [];
+
+            const snapshot = await renderShuttleSnapshot(
+              grid,
+              entities,
+              decals,
+              state.registry,
+              {
+                padding: 1,
+                backgroundColor,
+                maxDimension,
+                waitForAssets: true,
+                assetTimeoutMs: 8000,
+              },
+            );
+
+            window.parent.postMessage(
+              {
+                type: 'WEBMAP_RENDER_RESULT',
+                jobId,
+                ok: true,
+                dataUrl: snapshot.dataUrl,
+                width: snapshot.width,
+                height: snapshot.height,
+                tileWidth: snapshot.tileWidth,
+                tileHeight: snapshot.tileHeight,
+                entityCount: snapshot.entityCount,
+              },
+              window.location.origin,
+            );
+          } catch (err) {
+            window.parent.postMessage(
+              {
+                type: 'WEBMAP_RENDER_RESULT',
+                jobId,
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              window.location.origin,
+            );
+          }
+        });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    notifyReady();
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isBatchMode, state.registry, forkProvider]);
 
   const activeTool = TOOL_MAP[state.activeTool] ?? null;
 
@@ -771,6 +875,17 @@ export const App: React.FC = () => {
   // Show loading screen while registry loads
   if (!state.registry && !loadFailed) {
     return <LoadingScreen message={loadingMessage} />;
+  }
+
+  if (isBatchMode) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full bg-panel text-primary font-mono text-xs gap-2 p-4">
+        <div className="text-accent font-semibold tracking-wider uppercase">Exodus Batch Render Engine</div>
+        <div className="text-muted">
+          Monolith Ready: {state.registry?.entityCount ?? 0} entities / {state.registry?.tileCount ?? 0} tiles
+        </div>
+      </div>
+    );
   }
 
   return (

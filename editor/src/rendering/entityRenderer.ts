@@ -641,6 +641,10 @@ export function getExtraLayers(
   return undefined;
 }
 
+export function hasPendingEntityLoads(): boolean {
+  return loadingSet.size > 0 || extraLayerLoadingSet.size > 0;
+}
+
 export function clearExtraLayerCache(): void {
   extraLayerCache.clear();
   extraLayerLoadingSet.clear();

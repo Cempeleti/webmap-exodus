@@ -210,4 +210,5 @@ export const shuttleGroupColors: Record<string, string> = {
 
 export * from './userGallery';
 export * from './communityGallery';
+export * from './catalogOverrides';
 

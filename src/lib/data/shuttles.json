@@ -1277,7 +1277,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/azimuth-0.png"
+		"image": "/azimuth-0.png",
+		"mapPath": "maps/by-id/eighth-azimuth.yml"
 	},
 	{
 		"id": "eighth-wyvern",
@@ -1294,7 +1295,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/wyvern-0.png"
+		"image": "/wyvern-0.png",
+		"mapPath": "maps/by-id/eighth-wyvern.yml"
 	},
 	{
 		"id": "eighth-wyrm",
@@ -1312,7 +1314,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/wyrm-0.png"
+		"image": "/wyrm-0.png",
+		"mapPath": "maps/by-id/eighth-wyrm.yml"
 	},
 	{
 		"id": "eighth-zenith",
@@ -1329,7 +1332,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/zenith-0.png"
+		"image": "/zenith-0.png",
+		"mapPath": "maps/by-id/eighth-zenith.yml"
 	},
 	{
 		"id": "eighth-zenith-a",
@@ -1346,7 +1350,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/zenith_a-0.png"
+		"image": "/zenith_a-0.png",
+		"mapPath": "maps/by-id/eighth-zenith-a.yml"
 	},
 	{
 		"id": "eighth-zenith-e",
@@ -1363,7 +1368,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/zenith_e-0.png"
+		"image": "/zenith_e-0.png",
+		"mapPath": "maps/by-id/eighth-zenith-e.yml"
 	},
 	{
 		"id": "eighth-concord-x",
@@ -1381,7 +1387,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/concord_x-0.png"
+		"image": "/concord_x-0.png",
+		"mapPath": "maps/by-id/eighth-concord-x.yml"
 	},
 	{
 		"id": "eighth-crow",
@@ -1399,7 +1406,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/crow-0.png"
+		"image": "/crow-0.png",
+		"mapPath": "maps/by-id/eighth-crow.yml"
 	},
 	{
 		"id": "eighth-mantaray",
@@ -1417,7 +1425,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/mantaray-0.png"
+		"image": "/mantaray-0.png",
+		"mapPath": "maps/by-id/eighth-mantaray.yml"
 	},
 	{
 		"id": "eighth-nebula",
@@ -1435,7 +1444,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/nebula-0.png"
+		"image": "/nebula-0.png",
+		"mapPath": "maps/by-id/eighth-nebula.yml"
 	},
 	{
 		"id": "eighth-omen",
@@ -1453,7 +1463,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/omen-0.png"
+		"image": "/omen-0.png",
+		"mapPath": "maps/by-id/eighth-omen.yml"
 	},
 	{
 		"id": "eighth-razorn",
@@ -1471,7 +1482,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/razorn-0.png"
+		"image": "/razorn-0.png",
+		"mapPath": "maps/by-id/eighth-razorn.yml"
 	},
 	{
 		"id": "eighth-horizont",
@@ -1489,7 +1501,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/horizont-0.png"
+		"image": "/horizont-0.png",
+		"mapPath": "maps/by-id/eighth-horizont.yml"
 	},
 	{
 		"id": "eighth-stratostar",
@@ -1507,7 +1520,8 @@
 			"rtg",
 			"apu"
 		],
-		"image": "/stratostar-0.png"
+		"image": "/stratostar-0.png",
+		"mapPath": "maps/by-id/eighth-stratostar.yml"
 	},
 	{
 		"id": "Arkansaw",
@@ -1853,7 +1867,8 @@
 			"apu"
 		],
 		"image": "/assembly-0.png",
-		"hullClass": "corvette"
+		"hullClass": "corvette",
+		"mapPath": "maps/by-id/drone-assembly.yml"
 	},
 	{
 		"id": "drone-gust",
@@ -1871,7 +1886,8 @@
 			"apu"
 		],
 		"image": "/gust-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-gust.yml"
 	},
 	{
 		"id": "drone-dander",
@@ -1888,7 +1904,8 @@
 			"rtg"
 		],
 		"image": "/dander-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-dander.yml"
 	},
 	{
 		"id": "drone-deflector",
@@ -1905,7 +1922,8 @@
 			"apu"
 		],
 		"image": "/deflector-0.png",
-		"hullClass": "frigate"
+		"hullClass": "frigate",
+		"mapPath": "maps/by-id/drone-deflector.yml"
 	},
 	{
 		"id": "drone-dreadnought",
@@ -1923,7 +1941,8 @@
 		],
 		"image": "/Dreadnought-0.png",
 		"hullClass": "battleship",
-		"voucher": false
+		"voucher": false,
+		"mapPath": "maps/by-id/drone-dreadnought.yml"
 	},
 	{
 		"id": "drone-reaper",
@@ -1940,7 +1959,8 @@
 			"apu"
 		],
 		"image": "/reaper-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-reaper.yml"
 	},
 	{
 		"id": "drone-needle",
@@ -1958,7 +1978,8 @@
 			"apu"
 		],
 		"image": "/needle-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-needle.yml"
 	},
 	{
 		"id": "drone-quake",
@@ -1974,7 +1995,8 @@
 			"rtg"
 		],
 		"image": "/quake-0.png",
-		"hullClass": "destroyer"
+		"hullClass": "destroyer",
+		"mapPath": "maps/by-id/drone-quake.yml"
 	},
 	{
 		"id": "drone-wedge",
@@ -1991,7 +2013,8 @@
 			"apu"
 		],
 		"image": "/wedge-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-wedge.yml"
 	},
 	{
 		"id": "drone-lance",
@@ -2009,7 +2032,8 @@
 			"apu"
 		],
 		"image": "/lance-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-lance.yml"
 	},
 	{
 		"id": "drone-crown",
@@ -2026,7 +2050,8 @@
 			"apu"
 		],
 		"image": "/crown-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-crown.yml"
 	},
 	{
 		"id": "drone-bracket",
@@ -2043,7 +2068,8 @@
 			"rtg"
 		],
 		"image": "/bracket-0.png",
-		"hullClass": "corvette"
+		"hullClass": "corvette",
+		"mapPath": "maps/by-id/drone-bracket.yml"
 	},
 	{
 		"id": "drone-lens",
@@ -2060,7 +2086,8 @@
 			"rtg"
 		],
 		"image": "/lens-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-lens.yml"
 	},
 	{
 		"id": "drone-mauler",
@@ -2077,7 +2104,8 @@
 			"apu"
 		],
 		"image": "/mauler-0.png",
-		"hullClass": "cruiser"
+		"hullClass": "cruiser",
+		"mapPath": "maps/by-id/drone-mauler.yml"
 	},
 	{
 		"id": "drone-medusa",
@@ -2094,7 +2122,8 @@
 			"apu"
 		],
 		"image": "/medusa-0.png",
-		"hullClass": "corvette"
+		"hullClass": "corvette",
+		"mapPath": "maps/by-id/drone-medusa.yml"
 	},
 	{
 		"id": "drone-mote",
@@ -2111,7 +2140,8 @@
 			"rtg"
 		],
 		"image": "/mote-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-mote.yml"
 	},
 	{
 		"id": "drone-wasp",
@@ -2129,7 +2159,8 @@
 			"apu"
 		],
 		"image": "/wasp-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-wasp.yml"
 	},
 	{
 		"id": "drone-piercer",
@@ -2146,7 +2177,8 @@
 			"apu"
 		],
 		"image": "/piercer-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-piercer.yml"
 	},
 	{
 		"id": "drone-mpulsar",
@@ -2163,7 +2195,8 @@
 			"apu"
 		],
 		"image": "/mpulsar-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-mpulsar.yml"
 	},
 	{
 		"id": "drone-ramdronesmall",
@@ -2181,7 +2214,8 @@
 			"apu"
 		],
 		"image": "/ramdronesmall-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-ramdronesmall.yml"
 	},
 	{
 		"id": "drone-ramdronemedium",
@@ -2199,7 +2233,8 @@
 			"apu"
 		],
 		"image": "/ramdronemedium-0.png",
-		"hullClass": "corvette"
+		"hullClass": "corvette",
+		"mapPath": "maps/by-id/drone-ramdronemedium.yml"
 	},
 	{
 		"id": "drone-flashbang",
@@ -2217,7 +2252,8 @@
 			"apu"
 		],
 		"image": "/flashbang-0.png",
-		"hullClass": "fighter"
+		"hullClass": "fighter",
+		"mapPath": "maps/by-id/drone-flashbang.yml"
 	},
 	{
 		"id": "Intermission",
@@ -3217,7 +3253,8 @@
 		],
 		"image": "/arcturus-0.png",
 		"hullClass": "cruiser",
-		"voucher": false
+		"voucher": false,
+		"mapPath": "maps/by-id/Arcturus.yml"
 	},
 	{
 		"id": "Tumour",
@@ -3279,7 +3316,8 @@
 		],
 		"image": "/flyssa_abaddon-0.png",
 		"hullClass": "battleship",
-		"voucher": true
+		"voucher": true,
+		"mapPath": "maps/by-id/FlyssaAbaddon.yml"
 	},
 	{
 		"id": "Sentinel",
@@ -4886,7 +4924,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/ruin_tanker-0.png"
+		"image": "/ruin_tanker-0.png",
+		"mapPath": "maps/by-id/station-ruin-tanker.yml"
 	},
 	{
 		"id": "station-bahama",
@@ -4903,7 +4942,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/bahama-0.png"
+		"image": "/bahama-0.png",
+		"mapPath": "maps/by-id/station-bahama.yml"
 	},
 	{
 		"id": "station-polaris",
@@ -4920,7 +4960,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/polaris-0.png"
+		"image": "/polaris-0.png",
+		"mapPath": "maps/by-id/station-polaris.yml"
 	},
 	{
 		"id": "station-arena",
@@ -4936,7 +4977,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/arena-0.png"
+		"image": "/arena-0.png",
+		"mapPath": "maps/by-id/station-arena.yml"
 	},
 	{
 		"id": "station-derelictdrillsite",
@@ -4953,7 +4995,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/derelictdrillsite-0.png"
+		"image": "/derelictdrillsite-0.png",
+		"mapPath": "maps/by-id/station-derelictdrillsite.yml"
 	},
 	{
 		"id": "station-whale",
@@ -4967,7 +5010,8 @@
 		"engines": [
 			"supermatter"
 		],
-		"image": "/whale-0.png"
+		"image": "/whale-0.png",
+		"mapPath": "maps/by-id/station-whale.yml"
 	},
 	{
 		"id": "station-ads-medium-platform",
@@ -4983,7 +5027,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/ads_medium_platform-0.png"
+		"image": "/ads_medium_platform-0.png",
+		"mapPath": "maps/by-id/station-ads-medium-platform.yml"
 	},
 	{
 		"id": "station-cargodepot",
@@ -4999,7 +5044,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/cargodepot-0.png"
+		"image": "/cargodepot-0.png",
+		"mapPath": "maps/by-id/station-cargodepot.yml"
 	},
 	{
 		"id": "station-cargodepotalt",
@@ -5015,7 +5061,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/cargodepotalt-0.png"
+		"image": "/cargodepotalt-0.png",
+		"mapPath": "maps/by-id/station-cargodepotalt.yml"
 	},
 	{
 		"id": "station-sevastopol",
@@ -5031,7 +5078,8 @@
 		"engines": [
 			"supermatter"
 		],
-		"image": "/sevastopol-0.png"
+		"image": "/sevastopol-0.png",
+		"mapPath": "maps/by-id/station-sevastopol.yml"
 	},
 	{
 		"id": "station-ads-small-ancient-storage",
@@ -5045,7 +5093,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/ads_small_ancient_storage-0.png"
+		"image": "/ads_small_ancient_storage-0.png",
+		"mapPath": "maps/by-id/station-ads-small-ancient-storage.yml"
 	},
 	{
 		"id": "station-pdvhelios",
@@ -5061,7 +5110,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/pdvhelios-0.png"
+		"image": "/pdvhelios-0.png",
+		"mapPath": "maps/by-id/station-pdvhelios.yml"
 	},
 	{
 		"id": "station-pdv-civilian-outpost",
@@ -5077,7 +5127,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/pdv_civilian_outpost-0.png"
+		"image": "/pdv_civilian_outpost-0.png",
+		"mapPath": "maps/by-id/station-pdv-civilian-outpost.yml"
 	},
 	{
 		"id": "station-tsfmcoutpost",
@@ -5093,7 +5144,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/tsfmcoutpost-0.png"
+		"image": "/tsfmcoutpost-0.png",
+		"mapPath": "maps/by-id/station-tsfmcoutpost.yml"
 	},
 	{
 		"id": "station-caseyscasino",
@@ -5109,7 +5161,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/caseyscasino-0.png"
+		"image": "/caseyscasino-0.png",
+		"mapPath": "maps/by-id/station-caseyscasino.yml"
 	},
 	{
 		"id": "station-tsfmchalcyon",
@@ -5123,7 +5176,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/tsfmchalcyon-0.png"
+		"image": "/tsfmchalcyon-0.png",
+		"mapPath": "maps/by-id/station-tsfmchalcyon.yml"
 	},
 	{
 		"id": "station-colossus-central",
@@ -5142,7 +5196,8 @@
 			"solar",
 			"ame"
 		],
-		"image": "/colossus_central-0.png"
+		"image": "/colossus_central-0.png",
+		"mapPath": "maps/by-id/station-colossus-central.yml"
 	},
 	{
 		"id": "station-anomalouslab",
@@ -5158,7 +5213,8 @@
 		"engines": [
 			"supermatter"
 		],
-		"image": "/anomalouslab-0.png"
+		"image": "/anomalouslab-0.png",
+		"mapPath": "maps/by-id/station-anomalouslab.yml"
 	},
 	{
 		"id": "station-small-meteo-station",
@@ -5174,7 +5230,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/small_meteo_station-0.png"
+		"image": "/small_meteo_station-0.png",
+		"mapPath": "maps/by-id/station-small-meteo-station.yml"
 	},
 	{
 		"id": "station-hokkaido",
@@ -5192,7 +5249,8 @@
 			"solar",
 			"ame"
 		],
-		"image": "/hokkaido-0.png"
+		"image": "/hokkaido-0.png",
+		"mapPath": "maps/by-id/station-hokkaido.yml"
 	},
 	{
 		"id": "station-hammeroftheunion",
@@ -5208,7 +5266,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/hammeroftheunion-0.png"
+		"image": "/hammeroftheunion-0.png",
+		"mapPath": "maps/by-id/station-hammeroftheunion.yml"
 	},
 	{
 		"id": "station-special-wreck",
@@ -5224,7 +5283,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/special_wreck-0.png"
+		"image": "/special_wreck-0.png",
+		"mapPath": "maps/by-id/station-special-wreck.yml"
 	},
 	{
 		"id": "station-fragmentofprison",
@@ -5240,7 +5300,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/fragmentofprison-0.png"
+		"image": "/fragmentofprison-0.png",
+		"mapPath": "maps/by-id/station-fragmentofprison.yml"
 	},
 	{
 		"id": "station-burnedshuttle",
@@ -5256,7 +5317,8 @@
 		"engines": [
 			"apu"
 		],
-		"image": "/burnedshuttle-0.png"
+		"image": "/burnedshuttle-0.png",
+		"mapPath": "maps/by-id/station-burnedshuttle.yml"
 	},
 	{
 		"id": "station-damaged-arkansaw",
@@ -5272,7 +5334,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/damaged_arkansaw-0.png"
+		"image": "/damaged_arkansaw-0.png",
+		"mapPath": "maps/by-id/station-damaged-arkansaw.yml"
 	},
 	{
 		"id": "station-cruiseship",
@@ -5288,7 +5351,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/cruiseship-0.png"
+		"image": "/cruiseship-0.png",
+		"mapPath": "maps/by-id/station-cruiseship.yml"
 	},
 	{
 		"id": "station-ads-big-ancient-storage",
@@ -5302,7 +5366,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/ads_big_ancient_storage-0.png"
+		"image": "/ads_big_ancient_storage-0.png",
+		"mapPath": "maps/by-id/station-ads-big-ancient-storage.yml"
 	},
 	{
 		"id": "station-lpbravo",
@@ -5316,7 +5381,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/lpbravo-0.png"
+		"image": "/lpbravo-0.png",
+		"mapPath": "maps/by-id/station-lpbravo.yml"
 	},
 	{
 		"id": "station-zvezda",
@@ -5334,7 +5400,8 @@
 			"solar",
 			"ame"
 		],
-		"image": "/zvezda-0.png"
+		"image": "/zvezda-0.png",
+		"mapPath": "maps/by-id/station-zvezda.yml"
 	},
 	{
 		"id": "station-trademall",
@@ -5351,7 +5418,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/trademall-0.png"
+		"image": "/trademall-0.png",
+		"mapPath": "maps/by-id/station-trademall.yml"
 	},
 	{
 		"id": "station-tsfmc-industry",
@@ -5368,7 +5436,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/tsfmc_industry-0.png"
+		"image": "/tsfmc_industry-0.png",
+		"mapPath": "maps/by-id/station-tsfmc-industry.yml"
 	},
 	{
 		"id": "station-camelot",
@@ -5382,7 +5451,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/camelot-0.png"
+		"image": "/camelot-0.png",
+		"mapPath": "maps/by-id/station-camelot.yml"
 	},
 	{
 		"id": "station-lancelot",
@@ -5399,7 +5469,8 @@
 		"engines": [
 			"solar"
 		],
-		"image": "/lancelot-0.png"
+		"image": "/lancelot-0.png",
+		"mapPath": "maps/by-id/station-lancelot.yml"
 	},
 	{
 		"id": "station-zenith-poi",
@@ -5415,7 +5486,8 @@
 		"engines": [
 			"ame"
 		],
-		"image": "/zenith_poi-0.png"
+		"image": "/zenith_poi-0.png",
+		"mapPath": "maps/by-id/station-zenith-poi.yml"
 	},
 	{
 		"id": "Hydra",

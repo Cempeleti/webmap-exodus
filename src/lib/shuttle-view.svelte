@@ -8,6 +8,14 @@
 
 	let { shuttle }: Props = $props();
 	let borderColor = $derived(shuttleGroupColors[shuttle.group] ?? '#0B9FC0');
+	let resolvedImgSrc = $derived(
+		shuttle.image.startsWith('data:') ||
+			shuttle.image.startsWith('http://') ||
+			shuttle.image.startsWith('https://') ||
+			shuttle.image.startsWith('/api/')
+			? shuttle.image
+			: asset(shuttle.image as `/${string}`)
+	);
 </script>
 
 <a
@@ -18,7 +26,7 @@
 >
 	<!-- Image area -->
 	<div class="card-image scanline-overlay">
-		<img src={asset(shuttle.image as `/${string}`)} alt={shuttle.name} loading="lazy" />
+		<img src={resolvedImgSrc} alt={shuttle.name} loading="lazy" />
 		<!-- Faction corner tag -->
 		<span class="faction-badge" aria-label="Верфь: {shuttleConfig.shipyard[shuttle.group]}">
 			{shuttleConfig.shipyard[shuttle.group]}

@@ -153,10 +153,17 @@ export function getSpaceBgLayers(): { dust: HTMLImageElement | null; stars: HTML
  * loading failed / no sprite exists for that tile.
  */
 const tileImageCache = new Map<string, HTMLImageElement | null>();
+const tileLoadingSet = new Set<string>();
+
+/** Returns true if any tile texture fetches are currently in flight. */
+export function hasPendingTileLoads(): boolean {
+  return tileLoadingSet.size > 0;
+}
 
 /** Clear the tile image cache (e.g., when switching maps or reloading). */
 export function clearTileImageCache(): void {
   tileImageCache.clear();
+  tileLoadingSet.clear();
 }
 
 /**
@@ -195,6 +202,7 @@ function getTileImage(
   if (!url) {
     return null;
   }
+  tileLoadingSet.add(tileId);
   loadImage(url)
     .then((img) => {
       tileImageCache.set(tileId, img);
@@ -202,6 +210,9 @@ function getTileImage(
     })
     .catch(() => {
       tileImageCache.set(tileId, null);
+    })
+    .finally(() => {
+      tileLoadingSet.delete(tileId);
     });
 
   return null;

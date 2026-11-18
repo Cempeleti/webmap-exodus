@@ -4,12 +4,16 @@
 	import {
 		formatPrice,
 		getShuttleById,
+		getShuttles,
+		fetchCatalogPublicState,
+		mergeCatalogWithOverrides,
 		getUserGalleryItem,
 		getUserGalleryItemAsync,
 		getCommunityShuttleById,
 		fetchCommunityShuttleById,
 		shuttleConfig,
 		shuttleGroupColors,
+		type CatalogPublicState,
 		type Shuttle,
 		type ShuttleGroup,
 		type ShuttleHullClass,
@@ -18,12 +22,20 @@
 	import { page } from '$app/state';
 	import { asset, base, resolve } from '$app/paths';
 	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 	import configJson from '$root/config.json' with { type: 'json' };
 
 	let isModalOpen = $state(false);
 	let shareCopied = $state(false);
 	let isLoadingShared = $state(false);
 	let customShuttle = $state<Shuttle | null>(null);
+	let catalogState = $state<CatalogPublicState | null>(null);
+
+	onMount(() => {
+		fetchCatalogPublicState().then((st) => {
+			catalogState = st;
+		});
+	});
 
 	let id = $derived(browser ? (page.url.searchParams.get('id') ?? '') : '');
 	let communityIdParam = $derived(browser ? (page.url.searchParams.get('communityId') ?? '') : '');
@@ -209,7 +221,12 @@
 		customShuttle = null;
 	});
 
-	let shuttle = $derived(isCustom ? customShuttle : getShuttleById(id));
+	let mergedShuttles = $derived(
+		mergeCatalogWithOverrides(getShuttles(), catalogState, { includeHidden: true })
+	);
+	let shuttle = $derived(
+		isCustom ? customShuttle : mergedShuttles.find((s) => s.id === id) ?? getShuttleById(id)
+	);
 	let factionColor = $derived(
 		shuttle ? (shuttleGroupColors[shuttle.group] ?? '#00adb5') : '#00adb5'
 	);

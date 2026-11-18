@@ -24,6 +24,11 @@ export function sortDecals(decals: DecalInstance[]): DecalInstance[] {
   });
 }
 
+/** Returns true if any decal texture fetches are currently in flight. */
+export function hasPendingDecalLoads(): boolean {
+  return loading.size > 0;
+}
+
 /** Clear the sprite and tint caches. */
 export function clearDecalSpriteCache(): void {
   cache.clear();

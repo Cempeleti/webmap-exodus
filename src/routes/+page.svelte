@@ -5,8 +5,11 @@
 		defaultShuttleFilters,
 		filterShuttles,
 		getShuttles,
+		fetchCatalogPublicState,
+		mergeCatalogWithOverrides,
 		normalizeGroup,
 		shuttleConfig,
+		type CatalogPublicState,
 		type ShuttleClass,
 		type ShuttleEngine,
 		type ShuttleGroup,
@@ -21,7 +24,9 @@
 	import { onMount } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
-	const shuttles = getShuttles();
+	const baseShuttles = getShuttles();
+	let catalogState = $state<CatalogPublicState | null>(null);
+	const shuttles = $derived(mergeCatalogWithOverrides(baseShuttles, catalogState));
 	let filters = $state({
 		...defaultShuttleFilters
 	});
@@ -63,6 +68,17 @@
 		if (params.get('sale') === '1') filters.onlyForSale = true;
 		if (params.get('voucher') === '1') filters.onlyVoucher = true;
 		if (params.has('sort')) filters.sortBy = (params.get('sort') as ShuttleSort) ?? 'default';
+
+		fetchCatalogPublicState().then((st) => {
+			catalogState = st;
+		});
+		const onCatalogUpdate = () => {
+			fetchCatalogPublicState(true).then((st) => {
+				catalogState = st;
+			});
+		};
+		window.addEventListener('webmap:catalog_updated', onCatalogUpdate);
+		return () => window.removeEventListener('webmap:catalog_updated', onCatalogUpdate);
 	});
 
 	$effect(() => {
