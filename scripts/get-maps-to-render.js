@@ -20,16 +20,9 @@ const EXCLUDED_POI_FILES = new Set([
 
 const MAP_DIRS = [
 	'Resources/SharedMaps',
-	'Resources/SharedMaps/_Mono/Shuttles/Mieyo',
-	'Resources/Maps/_Mono/Shuttles',
 	'Resources/Maps/_Mono/POI',
-	'Resources/Maps/_Mono/Outpost',
-	'Resources/Maps/_Exodus/Shuttles',
-	'Resources/Maps/_Exodus/ShuttleEvent',
 	'Resources/Maps/_Exodus/POI',
-	'Resources/Maps/_Exodus/Supercapitals',
-	'Resources/Maps/_Exodus/Outpost',
-	'Resources/Maps/Shuttles'
+	'Resources/Maps/_NF/POI'
 ];
 
 /**

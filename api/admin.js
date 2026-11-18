@@ -586,6 +586,16 @@ async function adminDeleteGalleryItem(backend, id, authOpts) {
 	await fs.rm(path.join(LOCAL_GALLERY_DIR, 'images', `${safeId}.webp`), { force: true });
 }
 
+/**
+ * Allow all shuttles under Resources/SharedMaps/ and only POI maps under Resources/Maps/.
+ * @param {string} relPath
+ */
+function isAllowedMonolithMapPath(relPath) {
+	if (!relPath || !relPath.endsWith('.yml') || relPath.includes('..')) return false;
+	if (relPath.startsWith('Resources/SharedMaps/')) return true;
+	return /^Resources\/Maps\/(?:[^/]+\/)*POI\/.*\.yml$/i.test(relPath);
+}
+
 // ---------------- Main Handler ----------------
 
 /**
@@ -947,25 +957,25 @@ export default async function handler(req, res) {
 					(/** @type {any} */ node) =>
 						node.type === 'blob' &&
 						typeof node.path === 'string' &&
-						node.path.endsWith('.yml') &&
-						(node.path.startsWith('Resources/Maps/') || node.path.startsWith('Resources/SharedMaps/'))
+						isAllowedMonolithMapPath(node.path)
 				)
 				.map((/** @type {any} */ node) => ({
 					path: node.path,
 					name: node.path.split('/').pop(),
-					size: node.size || 0
-				}));
+					size: node.size || 0,
+					kind: node.path.startsWith('Resources/SharedMaps/') ? 'shared' : 'poi'
+				}))
+				.sort((/** @type {any} */ a, /** @type {any} */ b) => {
+					if (a.kind !== b.kind) return a.kind === 'shared' ? -1 : 1;
+					return a.path.localeCompare(b.path);
+				});
 			return sendJson(res, 200, { ok: true, files, total: files.length });
 		}
 
 		if (req.method === 'GET' && action === 'monolith-file') {
 			const relPath = String(query.get('path') || '').replace(/^\/+/, '');
-			if (
-				!relPath.endsWith('.yml') ||
-				relPath.includes('..') ||
-				(!relPath.startsWith('Resources/Maps/') && !relPath.startsWith('Resources/SharedMaps/'))
-			) {
-				throw httpError('Недопустимый путь к карте Monolith.', 400);
+			if (!isAllowedMonolithMapPath(relPath)) {
+				throw httpError('Разрешены только карты из Resources/SharedMaps и POI из Resources/Maps.', 400);
 			}
 			const rawUrl = `https://raw.githubusercontent.com/SerbiaStrong-220/Monolith/master/${relPath}`;
 			const r = await fetch(rawUrl);

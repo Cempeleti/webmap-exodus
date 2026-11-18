@@ -45,6 +45,7 @@
 		path: string;
 		name: string;
 		size: number;
+		kind?: 'shared' | 'poi';
 	}
 
 	interface RenderEngineResult {
@@ -106,6 +107,7 @@
 	// Local YAML files & Monolith GitHub tree
 	let localYamlFiles = $state<Array<{ id: string; name: string; filename: string; yamlText: string }>>([]);
 	let monolithFiles = $state<MonolithFileEntry[]>([]);
+	let monolithKindFilter = $state<'all' | 'shared' | 'poi'>('all');
 	let monolithLoading = $state(false);
 	let monolithError = $state<string | null>(null);
 	let monolithSelectedPaths = $state<Set<string>>(new Set());
@@ -202,6 +204,8 @@
 	const filteredMonolithFiles = $derived.by(() => {
 		const q = batchSearch.trim().toLowerCase();
 		return monolithFiles.filter((f) => {
+			const kind = f.kind ?? (f.path.startsWith('Resources/SharedMaps/') ? 'shared' : 'poi');
+			if (monolithKindFilter !== 'all' && kind !== monolithKindFilter) return false;
 			if (!q) return true;
 			return f.path.toLowerCase().includes(q);
 		});
@@ -544,18 +548,39 @@
 			}));
 		}
 
-		// Monolith GitHub direct source
+		// Monolith GitHub direct source (SharedMaps shuttles + Maps POI only)
 		const chosen =
 			monolithSelectedPaths.size > 0
 				? filteredMonolithFiles.filter((f) => monolithSelectedPaths.has(f.path))
 				: filteredMonolithFiles;
 		return chosen.map((f) => {
 			const stem = f.name.replace(/\.yml$/i, '');
-			const existingMatch = mergedCatalog.find(
-				(s) =>
-					s.id.toLowerCase() === stem.toLowerCase() ||
-					s.image.replace(/^\//, '').replace(/-0\.png$/i, '').toLowerCase() === stem.toLowerCase()
-			);
+			const stemLow = stem.toLowerCase();
+			const lowerPath = f.path.toLowerCase();
+
+			let existingMatch: Shuttle | undefined;
+			if (lowerPath.includes('/companies/blackhawk/scarab.yml')) {
+				existingMatch = mergedCatalog.find((s) => s.id === 'BlackhawkScarab');
+			} else if (lowerPath.includes('/expedition/medusa.yml')) {
+				existingMatch = mergedCatalog.find((s) => s.id === 'Medusa');
+			} else if (lowerPath.includes('/world/')) {
+				existingMatch = mergedCatalog.find((s) => s.id.toLowerCase() === `drone-${stemLow}`);
+			} else if (lowerPath.includes('/poi/')) {
+				existingMatch = mergedCatalog.find(
+					(s) =>
+						s.id.toLowerCase() === `station-${stemLow.replace(/_/g, '-')}` ||
+						(s.group === 'station' &&
+							s.image.replace(/^\//, '').replace(/-0\.png$/i, '').toLowerCase() === stemLow)
+				);
+			}
+			if (!existingMatch) {
+				existingMatch = mergedCatalog.find(
+					(s) =>
+						s.id.toLowerCase() === stemLow ||
+						s.image.replace(/^\//, '').replace(/-0\.png$/i, '').toLowerCase() === stemLow
+				);
+			}
+
 			return {
 				key: `mono:${f.path}`,
 				id: existingMatch ? existingMatch.id : `mono_${stem.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
@@ -1341,7 +1366,7 @@
 								class:active={batchSource === 'monolith'}
 								onclick={() => (batchSource = 'monolith')}
 							>
-								3. Напрямую из Monolith GitHub
+								3. Из Monolith (SharedMaps + POI)
 							</button>
 						</div>
 
@@ -1456,12 +1481,21 @@
 									disabled={monolithLoading}
 									onclick={handleLoadMonolithTree}
 								>
-									{monolithLoading ? '⏳ Загрузка списка...' : '🔄 Загрузить карты из SerbiaStrong-220/Monolith'}
+									{monolithLoading ? '⏳ Загрузка списка...' : '🔄 Загрузить SharedMaps и POI из Monolith'}
 								</button>
 								{#if monolithFiles.length > 0}
+									<select bind:value={monolithKindFilter} class="input-sm">
+										<option value="all">Все ({monolithFiles.length})</option>
+										<option value="shared">
+											SharedMaps ({monolithFiles.filter((f) => (f.kind ?? (f.path.startsWith('Resources/SharedMaps/') ? 'shared' : 'poi')) === 'shared').length})
+										</option>
+										<option value="poi">
+											POI из Maps ({monolithFiles.filter((f) => (f.kind ?? (f.path.startsWith('Resources/SharedMaps/') ? 'shared' : 'poi')) === 'poi').length})
+										</option>
+									</select>
 									<input
 										type="text"
-										placeholder="Фильтр пути (например _Exodus/Shuttles)..."
+										placeholder="Фильтр пути (_Exodus/Shuttles, _Mono/Shuttles, POI)..."
 										bind:value={batchSearch}
 										class="input-sm"
 									/>
